@@ -1,0 +1,124 @@
+use std::fmt;
+
+use crate::{pice::Pice, Color, singlemove::Move};
+
+pub struct Board{
+    pub pices: Vec<Pice>,
+    // board: Vec<Option<&Pice>>,
+    turn: Color,
+    moves: Vec<Move>,
+    passant: u64
+}
+
+impl Board {
+    fn new(pices: Vec<Pice>, turn: Color) -> Board{
+        Board { pices: pices, turn: turn, moves: vec![], passant: 0 }
+    }
+
+    pub fn default() -> Board{
+        Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+    }
+
+    pub fn from_fen(s: &str) -> Board{
+        let seq: Vec<&str> = s.split(" ").collect();
+        let mut pices: Vec<Pice> = vec![];
+        let mut i = 56;
+        for (_, c) in seq[0].char_indices(){
+            if c.is_numeric(){
+                i += c.to_digit(10).unwrap() as u8;
+            }else if c == '/' {
+                i -= 16
+            }else {
+                pices.push(Pice::from_char(c, i));
+                i+=1;
+            }
+        }
+        let turn = Color::from_char(seq[1].chars().nth(0).unwrap());
+        Board::new(pices, turn)
+    }
+
+    pub fn get_pice_pos(&self, p: u8) -> Option<&Pice>{
+        self.pices.iter().find(|&pice| pice.pos == p)
+    }
+
+    pub fn get_possible_moves(&self) -> Vec<Move>{
+        todo!()
+    }
+
+    pub fn make_move(&self, mv: Move) {
+        todo!()
+    }
+
+    pub fn undo_last_move(&self) {
+        todo!();
+    }
+}
+
+impl fmt::Display for Board {
+    // This trait requires `fmt` with this exact signature.
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // Write strictly the first element into the supplied output
+        // stream: `f`. Returns `fmt::Result` which indicates whether the
+        // operation succeeded or failed. Note that `write!` uses syntax which
+        // is very similar to `println!`.
+        let seq: Vec<String> = (0..64).map(| i | {
+            match &self.get_pice_pos(i) {
+                Some(p) => p.char(),
+                None => ".".into()
+            }
+        }).collect();
+        for row in seq.chunks(8).rev() {
+            for cell in row {
+                write!(f, "{} ", cell)?;
+            }
+            writeln!(f)?;
+        }
+        writeln!(f, "Turn: {:?}", self.turn)?;
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{board::Board, pice::Pice, Color, PiceType};
+
+    #[test]
+    fn fen_default() {
+        let b: Board = Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+        assert_eq!(b.turn, Color::White);
+        let pices: Vec<Option<&Pice>> = (0..64).map(|i| b.get_pice_pos(i)).collect();
+        for p in &pices[0..16]{
+            assert_eq!(p.unwrap().color(), Color::White)
+        }
+        for p in &pices[16..48]{
+            assert!(p.is_none())
+        }
+        for p in &pices[48..]{
+            assert_eq!(p.unwrap().color(), Color::Black)
+        }
+    }
+
+    #[test]
+    fn fen1() {
+        let b: Board = Board::from_fen("rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2");
+        assert_eq!(b.turn, Color::Black);
+        let pices: Vec<Option<&Pice>> = (0..64).map(|i| b.get_pice_pos(i)).collect();
+        assert_eq!(pices[21].unwrap().pice_type(), PiceType::Knight);
+        assert_eq!(pices[21].unwrap().color(), Color::White);
+        assert_eq!(pices[28].unwrap().pice_type(), PiceType::Pawn);
+        assert_eq!(pices[28].unwrap().color(), Color::White);
+        assert_eq!(pices[34].unwrap().pice_type(), PiceType::Pawn);
+        assert_eq!(pices[34].unwrap().color(), Color::Black);
+        assert!(pices[6].is_none());
+        assert!(pices[12].is_none());
+        assert!(pices[50].is_none());
+    }
+}
+
+
+// problems with moves
+// 1. an pessant
+// 2. casle
+// 3. pins
+// 4. checks
+// 5. promotions
