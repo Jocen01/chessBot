@@ -4,6 +4,7 @@ mod pice;
 mod board;
 mod singlemove;
 mod constants;
+mod state;
 
 
 #[derive(Debug,PartialEq)]
@@ -79,6 +80,14 @@ impl Color {
             panic!("not a valid color")
         }
     }
+}
+
+fn vec_pos_to_bitmap(pos: Vec<u8>) -> u64{
+    let mut res = 0;
+    for i in pos{
+        res |= 1<<i;
+    }
+    res
 }
 
 fn main() {

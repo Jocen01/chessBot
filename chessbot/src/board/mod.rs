@@ -1,18 +1,19 @@
-use std::fmt;
+use std::{borrow::BorrowMut, fmt};
 
-use crate::{pice::Pice, Color, singlemove::Move};
+use crate::{pice::{self, Pice}, singlemove::Move, state::{self, State}, Color, PiceType};
 
 pub struct Board{
     pub pices: Vec<Pice>,
     // board: Vec<Option<&Pice>>,
     turn: Color,
     moves: Vec<Move>,
-    passant: u64
+    pub state: State,
+    casle_rights: u8,
 }
 
 impl Board {
-    fn new(pices: Vec<Pice>, turn: Color) -> Board{
-        Board { pices: pices, turn: turn, moves: vec![], passant: 0 }
+    fn new(pices: Vec<Pice>, turn: Color, casle_rights: u8, state: State) -> Board{
+        Board { pices: pices, turn: turn, moves: vec![], state: state , casle_rights: casle_rights}
     }
 
     pub fn default() -> Board{
@@ -34,23 +35,74 @@ impl Board {
             }
         }
         let turn = Color::from_char(seq[1].chars().nth(0).unwrap());
-        Board::new(pices, turn)
+        let mut casle_rights = 0;
+        for (idx, c) in ['K', 'Q', 'k', 'q'].iter().enumerate(){
+            if seq[2].contains(*c){
+                casle_rights |= 1<<idx;
+            }
+        }
+        let mut state = State::default();
+        if seq[3] != "-"{
+            state.passant = 1<<Board::square_to_bitboard(seq[3])
+        }
+
+        Board::new(pices, turn, casle_rights, state)
     }
 
     pub fn get_pice_pos(&self, p: u8) -> Option<&Pice>{
         self.pices.iter().find(|&pice| pice.pos == p)
     }
 
+    pub fn update_moves(&mut self) {
+        self.reset_state_pices_bitboard();
+        for i in 0..self.pices.len(){
+            if PiceType::_type(self.pices[i].typ) == PiceType::Pawn{
+                self.pices[i].update_moves(&self.state);
+            }
+        }
+        self.reset_state_can_move();
+        
+    }
+
+    fn reset_state_pices_bitboard(&mut self){
+        self.state.reset_pices_bitboard();
+        self.pices.iter().for_each(|pice| {
+            if pice.color() == Color::White{
+                self.state.white_pices_bitboard |= 1<<pice.pos
+            }else {
+                self.state.black_pices_bitboard |= 1<<pice.pos
+            }
+        });
+    }
+
+    fn reset_state_can_move(&mut self){
+        self.state.reset_can_move();
+        self.pices.iter().for_each(|pice| {
+            if pice.color() == Color::White{
+                self.state.white_can_move |= pice.moves
+            }else {
+                self.state.black_can_move |= pice.moves
+            }
+        });
+    }
+
     pub fn get_possible_moves(&self) -> Vec<Move>{
         todo!()
     }
 
-    pub fn make_move(&self, mv: Move) {
+    pub fn make_move(&mut self, mv: Move) {
         todo!()
     }
 
-    pub fn undo_last_move(&self) {
+    pub fn undo_last_move(&mut self) {
         todo!();
+    }
+
+    fn square_to_bitboard(pos: &str) -> u8{
+        let mut bitboard: u8 = 0;
+        bitboard += pos.chars().nth(0).unwrap() as u8 - 'a' as u8;
+        bitboard + (((pos.chars().nth(1).unwrap().to_digit(10).unwrap() as u8)-1)<<3)
+
     }
 }
 
@@ -112,6 +164,27 @@ mod tests {
         assert!(pices[6].is_none());
         assert!(pices[12].is_none());
         assert!(pices[50].is_none());
+    }
+
+    #[test]
+    fn from_fen_en_passant_black() {
+        let b: Board = Board::from_fen("rnbqkbnr/ppp1p1pp/8/3pPp2/8/8/PPPP1PPP/RNBQKBNR w KQkq f6 0 3");
+        assert_eq!(b.state.passant, 1<<45);
+    }
+
+    #[test]
+    fn from_fen_en_passant_white() {
+        let b: Board = Board::from_fen("rnbqkbnr/ppp1p1pp/8/3pP3/5pP1/5N2/PPPP1P1P/RNBQKB1R b KQkq g3 0 4");
+        assert_eq!(b.state.passant, 1<<22);
+    }
+
+    #[test]
+    fn t() {
+        assert_eq!(Board::square_to_bitboard("a1"), 0);
+        assert_eq!(Board::square_to_bitboard("b1"), 1);
+        assert_eq!(Board::square_to_bitboard("c1"), 2);
+        assert_eq!(Board::square_to_bitboard("d4"), 27);
+        assert_eq!(Board::square_to_bitboard("h8"), 63);
     }
 }
 
