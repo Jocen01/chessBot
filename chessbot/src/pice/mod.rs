@@ -296,6 +296,24 @@ mod tests {
         b.update_moves();
         assert_eq!(b.get_pice_pos(29).unwrap().moves, vec_pos_to_bitmap(vec![22]));
     }
+
+    #[test]
+    fn horse_moves_default_board() {
+        let mut b: Board = Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+        b.update_moves();
+        assert_eq!(b.get_pice_pos(1).unwrap().moves, vec_pos_to_bitmap(vec![16,18]));
+        assert_eq!(b.get_pice_pos(6).unwrap().moves, vec_pos_to_bitmap(vec![21,23]));
+        assert_eq!(b.get_pice_pos(57).unwrap().moves, vec_pos_to_bitmap(vec![40,42]));
+        assert_eq!(b.get_pice_pos(62).unwrap().moves, vec_pos_to_bitmap(vec![45,47]));
+    }
+
+    #[test]
+    fn horse_moves_capture_pices() {
+        let mut b: Board = Board::from_fen("rnbqkb1r/pppppppp/2N5/8/8/2n5/PPPPPPPP/RNBQKB1R w KQkq - 6 4");
+        b.update_moves();
+        assert_eq!(b.get_pice_pos(42).unwrap().moves, vec_pos_to_bitmap(vec![59,52,36,27,25,32,48,57]));
+        assert_eq!(b.get_pice_pos(18).unwrap().moves, vec_pos_to_bitmap(vec![1,3,12,28,33,35,8,24]));
+    }
 }
 
 
