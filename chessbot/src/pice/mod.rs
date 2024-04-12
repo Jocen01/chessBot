@@ -123,7 +123,7 @@ impl Pice {
         let file = self.pos & 0b111;
         let rank = self.pos & 0b111000;
         let mut moves: u64 = 0;
-        for i in file..8{
+        for i in file+1..8{
             if state.pice_at(i | rank) {
                 if state.opposite_color_at(i | rank, self.color()){
                     moves |= 1<<(i | rank);
@@ -143,7 +143,7 @@ impl Pice {
                 moves |= 1<<(i | rank);
             }
         }
-        for i in rank..8{
+        for i in ((rank>>3)+1)..8{
             if state.pice_at((i<<3) | file) {
                 if state.opposite_color_at((i<<3) | file, self.color()){
                     moves |= 1<<((i<<3) | file);
@@ -153,7 +153,7 @@ impl Pice {
                 moves |= 1<<((i<<3) | file);
             }
         }
-        for i in (0..rank).rev(){
+        for i in (0..rank>>3).rev(){
             if state.pice_at((i<<3) | file) {
                 if state.opposite_color_at((i<<3) | file, self.color()){
                     moves |= 1<<((i<<3) | file);
@@ -172,13 +172,13 @@ impl Pice {
         let rank = (self.pos>>3) & 0b111;
         for i in 1..{
             if file + i < 8 && rank + i < 8{
-                if state.pice_at(file + i + (rank + i)<<3) {
-                    if state.opposite_color_at(file + i + (rank + i)<<3, self.color()){
-                        moves |= 1<<(file + i + (rank + i)<<3);
+                if state.pice_at(file + i + ((rank + i)<<3)) {
+                    if state.opposite_color_at(file + i + ((rank + i)<<3), self.color()){
+                        moves |= 1<<(file + i + ((rank + i)<<3));
                     }
                     break;
                 }else {
-                    moves |= 1<<(file + i + (rank + i)<<3);
+                    moves |= 1<<(file + i + ((rank + i)<<3));
                 }
             }else {
                 break;
@@ -186,13 +186,13 @@ impl Pice {
         }
         for i in 1..{
             if file + i < 8 && rank >= i{
-                if state.pice_at(file + i + (rank - i)<<3) {
-                    if state.opposite_color_at(file + i + (rank - i)<<3, self.color()){
-                        moves |= 1<<(file + i + (rank - i)<<3);
+                if state.pice_at(file + i + ((rank - i)<<3)) {
+                    if state.opposite_color_at(file + i + ((rank - i)<<3), self.color()){
+                        moves |= 1<<(file + i + ((rank - i)<<3));
                     }
                     break;
                 }else {
-                    moves |= 1<<(file + i + (rank - i)<<3);
+                    moves |= 1<<(file + i + ((rank - i)<<3));
                 }
             }else {
                 break;
@@ -200,13 +200,13 @@ impl Pice {
         }
         for i in 1..{
             if file >= i && rank >= i{
-                if state.pice_at(file - i + (rank - i)<<3) {
-                    if state.opposite_color_at(file - i + (rank - i)<<3, self.color()){
-                        moves |= 1<<(file - i + (rank - i)<<3);
+                if state.pice_at(file - i + ((rank - i)<<3)) {
+                    if state.opposite_color_at(file - i + ((rank - i)<<3), self.color()){
+                        moves |= 1<<(file - i + ((rank - i)<<3));
                     }
                     break;
                 }else {
-                    moves |= 1<<(file - i + (rank - i)<<3);
+                    moves |= 1<<(file - i + ((rank - i)<<3));
                 }
             }else {
                 break;
@@ -214,13 +214,13 @@ impl Pice {
         }
         for i in 1..{
             if file >= i && rank + i < 8{
-                if state.pice_at(file - i + (rank + i)<<3) {
-                    if state.opposite_color_at(file - i + (rank + i)<<3, self.color()){
-                        moves |= 1<<(file - i + (rank + i)<<3);
+                if state.pice_at(file - i + ((rank + i)<<3)) {
+                    if state.opposite_color_at(file - i + ((rank + i)<<3), self.color()){
+                        moves |= 1<<(file - i + ((rank + i)<<3));
                     }
                     break;
                 }else {
-                    moves |= 1<<(file - i + (rank + i)<<3);
+                    moves |= 1<<(file - i + ((rank + i)<<3));
                 }
             }else {
                 break;
@@ -237,7 +237,7 @@ mod tests {
 
     #[test]
     fn white_pawn_moves_default_board() {
-        let mut b: Board = Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+        let mut b: Board = Board::default();
         b.update_moves();
         assert_eq!(b.get_pice_pos(8).unwrap().moves, vec_pos_to_bitmap(vec![16,24]));
         assert_eq!(b.get_pice_pos(12).unwrap().moves, vec_pos_to_bitmap(vec![20,28]));
@@ -246,7 +246,7 @@ mod tests {
 
     #[test]
     fn black_pawn_moves_default_board() {
-        let mut b: Board = Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+        let mut b: Board = Board::default();
         b.update_moves();
         assert_eq!(b.get_pice_pos(48).unwrap().moves, vec_pos_to_bitmap(vec![40,32]));
         assert_eq!(b.get_pice_pos(52).unwrap().moves, vec_pos_to_bitmap(vec![44,36]));
@@ -299,7 +299,7 @@ mod tests {
 
     #[test]
     fn horse_moves_default_board() {
-        let mut b: Board = Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+        let mut b: Board = Board::default();
         b.update_moves();
         assert_eq!(b.get_pice_pos(1).unwrap().moves, vec_pos_to_bitmap(vec![16,18]));
         assert_eq!(b.get_pice_pos(6).unwrap().moves, vec_pos_to_bitmap(vec![21,23]));
@@ -313,6 +313,60 @@ mod tests {
         b.update_moves();
         assert_eq!(b.get_pice_pos(42).unwrap().moves, vec_pos_to_bitmap(vec![59,52,36,27,25,32,48,57]));
         assert_eq!(b.get_pice_pos(18).unwrap().moves, vec_pos_to_bitmap(vec![1,3,12,28,33,35,8,24]));
+    }
+
+    #[test]
+    fn rook_moves_default_board() {
+        let mut b: Board = Board::default();
+        b.update_moves();
+        assert_eq!(b.get_pice_pos(0).unwrap().moves, 0);
+        assert_eq!(b.get_pice_pos(7).unwrap().moves, 0);
+        assert_eq!(b.get_pice_pos(56).unwrap().moves, 0);
+        assert_eq!(b.get_pice_pos(63).unwrap().moves, 0);
+    }
+
+    #[test]
+    fn rook_moves_full_length_1() {
+        let mut b: Board = Board::from_fen("rnbqkbn1/pppppp2/r7/8/8/7R/PPPPPPP1/RNBQKBN1 w Qq - 2 5");
+        b.update_moves();
+        assert_eq!(b.get_pice_pos(23).unwrap().moves, vec_pos_to_bitmap(vec![7,15,31,39,47,55,63,16,17,18,19,20,21,22]));
+        let mut b: Board = Board::from_fen("1nbqkbn1/1ppppp2/6r1/1R6/r7/7R/1PPPPPP1/1NBQKBN1 b - - 2 10");
+        b.update_moves();
+        assert_eq!(b.get_pice_pos(24).unwrap().moves, vec_pos_to_bitmap(vec![0,8,16,32,40,48,56,25,26,27,28,29,30,31]));
+    }
+    
+    #[test]
+    fn rook_moves_capture() {
+        let mut b: Board = Board::from_fen("1nbqkbn1/1ppppp2/8/1R4r1/r7/7R/1PPPPPP1/1NBQKBN1 w - - 3 11");
+        b.update_moves();
+        assert_eq!(b.get_pice_pos(33).unwrap().moves, vec_pos_to_bitmap(vec![32,34,35,36,37,38,17,25,41,49]));
+        assert_eq!(b.get_pice_pos(38).unwrap().moves, vec_pos_to_bitmap(vec![14,22,30,46,54,33,34,35,36,37,39]));
+    }
+
+    #[test]
+    fn bishop_moves_default_board() {
+        let mut b: Board = Board::default();
+        b.update_moves();
+        assert_eq!(b.get_pice_pos(2).unwrap().moves, 0);
+        assert_eq!(b.get_pice_pos(5).unwrap().moves, 0);
+        assert_eq!(b.get_pice_pos(58).unwrap().moves, 0);
+        assert_eq!(b.get_pice_pos(61).unwrap().moves, 0);
+    }
+
+    #[test]
+    fn bishop_moves_full_length_1() {
+        let mut b: Board = Board::from_fen("1nbqk1n1/r1ppppbr/pp4p1/7p/7P/PP4P1/R1PPPPBR/1NBQK1N1 w - - 2 8");
+        b.update_moves();
+        assert_eq!(b.get_pice_pos(14).unwrap().moves, vec_pos_to_bitmap(vec![5,23,7,21,28,35,42,49,56]));
+        assert_eq!(b.get_pice_pos(54).unwrap().moves, vec_pos_to_bitmap(vec![47,61,0,9,18,27,36,45,63]));
+    }
+    
+    #[test]
+    fn bishop_moves_capture() {
+        let mut b: Board = Board::from_fen("1n1qk1n1/rbpp1p1r/pp2p1p1/3B3p/3b3P/PP3NP1/1RPPPP1R/1NBQK3 w - - 0 11");
+        b.update_moves();
+        assert_eq!(b.get_pice_pos(35).unwrap().moves, vec_pos_to_bitmap(vec![49,42,44,26,28]));
+        assert_eq!(b.get_pice_pos(27).unwrap().moves, vec_pos_to_bitmap(vec![9,18,20,13,34,36,45,54,63]));
     }
 }
 

@@ -82,6 +82,7 @@ impl Color {
     }
 }
 
+#[allow(dead_code)]
 fn vec_pos_to_bitmap(pos: Vec<u8>) -> u64{
     let mut res = 0;
     for i in pos{

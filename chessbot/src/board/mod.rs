@@ -57,6 +57,12 @@ impl Board {
             if self.pices[i].pice_type() == PiceType::Knight{
                 self.pices[i].update_moves(&self.state);
             }
+            if self.pices[i].pice_type() == PiceType::Rook{
+                self.pices[i].update_moves(&self.state);
+            }
+            if self.pices[i].pice_type() == PiceType::Bishop{
+                self.pices[i].update_moves(&self.state);
+            }
         }
         self.reset_state_can_move();
     }
