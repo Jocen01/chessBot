@@ -6,21 +6,24 @@ pub struct State{
     pub white_pices_bitboard: u64,
     pub black_pices_bitboard: u64,
     pub passant: u64,
+    pub casle_rights: u8,
+
 }
 
 impl State {
-    pub fn new(white_can_move: u64, black_can_move: u64, white_pices_bitboard: u64, black_pices_bitboard: u64, passant: u64) -> State{
+    pub fn new(white_can_move: u64, black_can_move: u64, white_pices_bitboard: u64, black_pices_bitboard: u64, passant: u64, casle_rights: u8) -> State{
         State {
             white_can_move, 
             black_can_move, 
             white_pices_bitboard, 
             black_pices_bitboard, 
-            passant
+            passant,
+            casle_rights
         }
     }
 
     pub fn default() -> State{
-        State { white_can_move: 0, black_can_move: 0, white_pices_bitboard: 0, black_pices_bitboard: 0 , passant: 0}
+        State { white_can_move: 0, black_can_move: 0, white_pices_bitboard: 0, black_pices_bitboard: 0 , passant: 0, casle_rights: 0}
     }
 
     pub fn pice_at(&self, pos: u8) -> bool{

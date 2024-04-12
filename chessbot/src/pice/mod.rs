@@ -233,7 +233,7 @@ impl Pice {
 
 #[cfg(test)]
 mod tests {
-    use crate::{board::Board, pice::Pice, Color, PiceType, vec_pos_to_bitmap};
+    use crate::{board::Board, vec_pos_to_bitmap};
 
     #[test]
     fn white_pawn_moves_default_board() {

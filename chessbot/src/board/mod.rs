@@ -1,6 +1,6 @@
-use std::{borrow::BorrowMut, fmt};
+use std::fmt;
 
-use crate::{pice::{self, Pice}, singlemove::Move, state::{self, State}, Color, PiceType};
+use crate::{pice::Pice, singlemove::Move, state::State, Color, PiceType};
 
 pub struct Board{
     pub pices: Vec<Pice>,
@@ -8,12 +8,11 @@ pub struct Board{
     turn: Color,
     moves: Vec<Move>,
     pub state: State,
-    casle_rights: u8,
 }
 
 impl Board {
-    fn new(pices: Vec<Pice>, turn: Color, casle_rights: u8, state: State) -> Board{
-        Board { pices: pices, turn: turn, moves: vec![], state: state , casle_rights: casle_rights}
+    fn new(pices: Vec<Pice>, turn: Color, state: State) -> Board{
+        Board { pices: pices, turn: turn, moves: vec![], state: state}
     }
 
     pub fn default() -> Board{
@@ -35,18 +34,14 @@ impl Board {
             }
         }
         let turn = Color::from_char(seq[1].chars().nth(0).unwrap());
-        let mut casle_rights = 0;
-        for (idx, c) in ['K', 'Q', 'k', 'q'].iter().enumerate(){
-            if seq[2].contains(*c){
-                casle_rights |= 1<<idx;
-            }
-        }
         let mut state = State::default();
         if seq[3] != "-"{
             state.passant = 1<<Board::square_to_bitboard(seq[3])
         }
+        state.casle_rights = Board::str_to_casle_rights(seq[2]);
 
-        Board::new(pices, turn, casle_rights, state)
+
+        Board::new(pices, turn, state)
     }
 
     pub fn get_pice_pos(&self, p: u8) -> Option<&Pice>{
@@ -56,12 +51,11 @@ impl Board {
     pub fn update_moves(&mut self) {
         self.reset_state_pices_bitboard();
         for i in 0..self.pices.len(){
-            if PiceType::_type(self.pices[i].typ) == PiceType::Pawn{
+            if self.pices[i].pice_type() == PiceType::Pawn{
                 self.pices[i].update_moves(&self.state);
             }
         }
         self.reset_state_can_move();
-        
     }
 
     fn reset_state_pices_bitboard(&mut self){
@@ -103,6 +97,16 @@ impl Board {
         bitboard += pos.chars().nth(0).unwrap() as u8 - 'a' as u8;
         bitboard + (((pos.chars().nth(1).unwrap().to_digit(10).unwrap() as u8)-1)<<3)
 
+    }
+
+    fn str_to_casle_rights(s: &str) -> u8{
+        let mut rights = 0;
+        for (idx, c) in vec!['K','Q','k','q'].iter().rev().enumerate(){
+            if s.contains(*c){
+                rights |= 1<<idx
+            }
+        }
+        rights
     }
 }
 
@@ -176,6 +180,23 @@ mod tests {
     fn from_fen_en_passant_white() {
         let b: Board = Board::from_fen("rnbqkbnr/ppp1p1pp/8/3pP3/5pP1/5N2/PPPP1P1P/RNBQKB1R b KQkq g3 0 4");
         assert_eq!(b.state.passant, 1<<22);
+    }
+
+    #[test]
+    fn from_fen_casle_rights_KQkq() {
+        let b: Board = Board::from_fen("rnbqkbnr/ppp1p1pp/8/3pP3/5pP1/5N2/PPPP1P1P/RNBQKB1R b KQkq g3 0 4");
+        assert_eq!(b.state.casle_rights, 0b1111);
+    }
+
+    #[test]
+    fn from_fen_casle_rights_Kk() {
+        let b: Board = Board::from_fen("1nbqkbnr/rpp1pppp/p7/4P3/3p4/P2P4/RPP2PPP/1NBQKBNR b Kk - 2 5");
+        assert_eq!(b.state.casle_rights, 0b1010);
+    }
+    #[test]
+    fn from_fen_casle_rights_Kq() {
+        let b: Board = Board::from_fen("rnbqkbn1/pppppppr/7p/8/8/P7/RPPPPPPP/1NBQKBNR w Kq - 2 3");
+        assert_eq!(b.state.casle_rights, 0b1001);
     }
 
     #[test]
