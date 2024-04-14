@@ -1,9 +1,13 @@
-use crate::{board::Board, constants, state::State, Color, PiceType};
+use crate::{constants, singlemove::{Move, MoveType}, state::State, Color, PiceType};
 
-#[derive(Debug)]
+
+const CAPTURE_BIT: u8 = 5;
+
+
+#[derive(Debug, PartialEq, Eq)]
 pub struct Pice{
-    pub typ: u8,
-    pub pos: u8,
+    pub typ: u8, //xxxCCTTT C=1 if captured
+    pub pos: u8, 
     pub moves: u64,
     pinned: bool,
 }
@@ -27,12 +31,49 @@ impl Pice {
         c
     }
 
+    pub fn is_captured(&self) -> bool{
+        self.typ & (1<<CAPTURE_BIT) != 0
+    }
+
+    pub fn capture(&mut self) {
+        self.typ |= 1<<CAPTURE_BIT;
+    }
+
+    pub fn uncapture(&mut self){
+        self.typ &= !(1<<CAPTURE_BIT)
+    }
+
     pub fn pice_type(&self) -> PiceType{
         PiceType::_type(self.typ)
     }
 
     pub fn color(&self) -> Color{
         Color::from_int(self.typ)
+    }
+
+    pub fn move_to(&mut self, mv: &Move) {
+        match mv.move_type() {
+            MoveType::Normal => self.pos = mv.to(),
+            MoveType::Castle => todo!("not yet implemented move type"),
+            MoveType::Pessant => todo!("not yet implemented move type"),
+            MoveType::PromotionQueen => todo!("not yet implemented move type"),
+            MoveType::PromotionRook => todo!("not yet implemented move type"),
+            MoveType::PromotionBishop => todo!("not yet implemented move type"),
+            MoveType::PromotionHorse => todo!("not yet implemented move type"),
+        }
+    }
+
+    pub fn undo_move(&mut self, mv: &Move) {
+        match mv.move_type() {
+            MoveType::Normal => self.pos = mv.from(),
+            MoveType::Castle => todo!("not yet implemented move type"),
+            MoveType::Pessant => todo!("not yet implemented move type"),
+            MoveType::PromotionQueen => todo!("not yet implemented move type"),
+            MoveType::PromotionRook => todo!("not yet implemented move type"),
+            MoveType::PromotionBishop => todo!("not yet implemented move type"),
+            MoveType::PromotionHorse => todo!("not yet implemented move type"),
+        }
+        
     }
 
     pub fn update_moves(&mut self, state: &State ) {
@@ -51,11 +92,14 @@ impl Pice {
         if Color::from_int(self.typ) == Color::White{
             self.moves = moves ^ (moves & state.white_pices_bitboard);
             self.moves ^= self.moves & state.black_can_move;
+            self.moves ^= self.moves & constants::KINGS_BIT_MOVES[state.black_king as usize]
         } else {
             self.moves = moves ^ (moves & state.black_pices_bitboard);
             self.moves ^= self.moves & state.white_can_move;
+            self.moves ^= self.moves & constants::KINGS_BIT_MOVES[state.white_king as usize]
+
         }
-        todo!("yet to implement casle")
+        // todo!("yet to implement casle")
     }
 
     fn update_moves_queen(&mut self, state: &State ) {
@@ -367,6 +411,31 @@ mod tests {
         b.update_moves();
         assert_eq!(b.get_pice_pos(35).unwrap().moves, vec_pos_to_bitmap(vec![49,42,44,26,28]));
         assert_eq!(b.get_pice_pos(27).unwrap().moves, vec_pos_to_bitmap(vec![9,18,20,13,34,36,45,54,63]));
+    }
+
+    #[test]
+    fn king_moves_default_board() {
+        let mut b: Board = Board::default();
+        b.update_moves();
+        assert_eq!(b.get_pice_pos(4).unwrap().moves, 0);
+        assert_eq!(b.get_pice_pos(60).unwrap().moves, 0);
+    }
+
+    // TODO by fixing the code for this test to pass would probobly speed up the move generation a LOT!
+    // #[test] 
+    // fn king_moves_move_into_check() {
+    //     let mut b: Board = Board::from_fen("rnbq1bnr/pppp1ppp/4p3/6k1/2K5/4P3/PPPP1PPP/RNBQ1BNR w - - 8 6");
+    //     b.update_moves();
+    //     assert_eq!(b.get_pice_pos(26).unwrap().moves, vec_pos_to_bitmap(vec![33,17,18,19,27]));
+    //     assert_eq!(b.get_pice_pos(38).unwrap().moves, vec_pos_to_bitmap(vec![45,46,47,37,31]));
+    // }
+
+    #[test] 
+    fn king_moves_move_only_blocked_by_own_pices() {
+        let mut b: Board = Board::from_fen("rnbq1bnr/pppp1ppp/4pk2/8/8/3KP3/PPPP1PPP/RNBQ1BNR w - - 10 7");
+        b.update_moves();
+        assert_eq!(b.get_pice_pos(19).unwrap().moves, vec_pos_to_bitmap(vec![26,27,28,18,12]));
+        assert_eq!(b.get_pice_pos(45).unwrap().moves, vec_pos_to_bitmap(vec![52,46,36,37,38]));
     }
 }
 

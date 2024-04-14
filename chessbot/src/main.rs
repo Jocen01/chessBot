@@ -1,4 +1,4 @@
-use crate::{board::Board, pice::Pice};
+use crate::board::Board;
 
 mod pice;
 mod board;
@@ -56,7 +56,7 @@ impl PiceType {
     }
 }
 
-#[derive(Debug,PartialEq)]
+#[derive(Debug,PartialEq, Clone, Copy)]
 pub enum Color {
     White = 8,
     Black = 16
@@ -77,7 +77,14 @@ impl Color {
         }else if i & 16 == 16 {
             Color::Black
         }else {
-            panic!("not a valid color")
+            panic!("{} not a valid color", i)
+        }
+    }
+
+    pub fn other(&self) -> Color{
+        match self {
+            Color::White => Color::Black,
+            Color::Black => Color::White,
         }
     }
 }
@@ -92,14 +99,18 @@ fn vec_pos_to_bitmap(pos: Vec<u8>) -> u64{
 }
 
 fn main() {
-    println!("Hello, world!");
-    let pawn = Pice::new(PiceType::Pawn, Color::White, 8);
-    println!("first pice {:?}", pawn);
-    let b = Board::from_fen("rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2");
+    let b = Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
     println!("{}", b);
-    let mut b = Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
-    println!("{}", b);
-    b.update_moves();
+    let mut b = Board::default();
+
+    let colors = vec![Color::White, Color::Black];
+    for i in 0..20{
+        let moves = b.get_possible_moves(colors[i%2]);
+        println!("{:?}, color: {:?}",moves, colors[i%2]);
+        b.make_move(moves[5]);
+        println!("{}", b);
+    }
+    b.undo_last_move();
 }
 
 
