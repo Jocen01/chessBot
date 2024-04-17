@@ -1,5 +1,13 @@
 use crate::Color;
 
+// can capture bitmap       2x
+// king bitmap / pos        2x
+// sliding pices bitmap     2x
+// pawns bitmap             2x
+// pices bitmap             2x
+// passant u8 / bitmap
+// castle rights
+
 pub struct State{
     pub white_can_move: u64,
     pub black_can_move: u64,
@@ -9,7 +17,6 @@ pub struct State{
     pub casle_rights: u8,
     pub white_king: u8,
     pub black_king: u8,
-
 }
 
 impl State {
@@ -86,5 +93,12 @@ impl State {
 
     pub fn passant_at(&self, pos: u8) -> bool{
         self.passant & (1<<pos) != 0
+    }
+
+    pub fn in_check(&self, color: Color) -> bool{
+        match color {
+            Color::White => (1<<self.white_king) & self.black_can_move != 0,
+            Color::Black => (1<<self.black_king) & self.white_can_move != 0
+        }
     }
 }

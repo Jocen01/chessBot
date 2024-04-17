@@ -6,6 +6,7 @@ pub enum MoveType {
     PromotionRook = 4,
     PromotionBishop = 5,
     PromotionHorse = 6,
+    Pawndubblemove = 7,
 }
 
 #[derive(Clone, Copy, Debug)]

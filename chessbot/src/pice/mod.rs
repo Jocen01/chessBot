@@ -53,9 +53,8 @@ impl Pice {
 
     pub fn move_to(&mut self, mv: &Move) {
         match mv.move_type() {
-            MoveType::Normal => self.pos = mv.to(),
+            MoveType::Normal | MoveType::Pessant | MoveType::Pawndubblemove => self.pos = mv.to(),
             MoveType::Castle => todo!("not yet implemented move type"),
-            MoveType::Pessant => todo!("not yet implemented move type"),
             MoveType::PromotionQueen => todo!("not yet implemented move type"),
             MoveType::PromotionRook => todo!("not yet implemented move type"),
             MoveType::PromotionBishop => todo!("not yet implemented move type"),
@@ -65,13 +64,12 @@ impl Pice {
 
     pub fn undo_move(&mut self, mv: &Move) {
         match mv.move_type() {
-            MoveType::Normal => self.pos = mv.from(),
+            MoveType::Normal | MoveType::Pessant | MoveType::Pawndubblemove => self.pos = mv.from(),
             MoveType::Castle => todo!("not yet implemented move type"),
-            MoveType::Pessant => todo!("not yet implemented move type"),
-            MoveType::PromotionQueen => todo!("not yet implemented move type"),
-            MoveType::PromotionRook => todo!("not yet implemented move type"),
-            MoveType::PromotionBishop => todo!("not yet implemented move type"),
-            MoveType::PromotionHorse => todo!("not yet implemented move type"),
+            MoveType::PromotionQueen | MoveType::PromotionRook | MoveType::PromotionBishop | MoveType::PromotionHorse => {
+                self.typ = (self.typ & 0b11111000) | (PiceType::Pawn as u8);
+                self.pos = mv.from();
+            },
         }
         
     }
@@ -446,3 +444,8 @@ mod tests {
 // 3. pins
 // 4. checks
 // 5. promotions
+
+// pinned pices
+// an passant pinned
+// get oposition attacks
+// 

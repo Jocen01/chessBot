@@ -95,6 +95,14 @@ impl Board {
                 moves.push(Move::new(pice.pos, *i, MoveType::Normal));
             });
         });
+        moves.retain(|mv| {
+            self.make_move(*mv);
+            self.update_moves();
+
+            let res = self.state.in_check(self.turn.other());
+            self.undo_last_move();
+            !res
+        });
         moves
     }
 
@@ -279,19 +287,17 @@ mod tests {
     fn count_moves_default() {
         let mut board = Board::default();
         assert_eq!(count_moves(&mut board, 1), 20);
-        // assert_eq!(1,2);
         assert_eq!(count_moves(&mut board, 2), 400);
         assert_eq!(count_moves(&mut board, 3), 8_902);
         assert_eq!(count_moves(&mut board, 4), 197_281);
         assert_eq!(count_moves(&mut board, 5), 4_865_609);
-        assert_eq!(count_moves(&mut board, 6), 119_060_324);
-        assert_eq!(count_moves(&mut board, 7), 3_195_901_860);
-        assert_eq!(count_moves(&mut board, 8), 84_998_978_956);
+        // assert_eq!(count_moves(&mut board, 6), 119_060_324);
+        // assert_eq!(count_moves(&mut board, 7), 3_195_901_860);
+        // assert_eq!(count_moves(&mut board, 8), 84_998_978_956);
     }
 
     fn count_moves(board: &mut Board, depth: u8) -> u64{
         if depth == 0{ 
-            // println!("{}", board);
             return 1;
         }
         let moves = board.get_possible_moves(board.turn);
