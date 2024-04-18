@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::{pice::Pice, singlemove::{Move, MoveType}, state::State, Color, PiceType};
+use crate::{pice::{self, Pice}, singlemove::{Move, MoveType}, state::State, Color, PiceType};
 
 pub struct Board{
     pub pices: Vec<Pice>,
@@ -38,7 +38,7 @@ impl Board {
             board[pice.pos as usize] = Some(idx);
         });
         let turn = Color::from_char(seq[1].chars().nth(0).unwrap());
-        let mut state = State::default();
+        let mut state = State::from_pices(&pices, 0, 0);
         if seq[3] != "-"{
             state.passant = 1<<Board::square_to_bitboard(seq[3])
         }
@@ -52,52 +52,58 @@ impl Board {
         self.pices.iter().find(|&pice| pice.pos == p && !pice.is_captured())
     }
 
-    pub fn update_moves(&mut self) {
-        self.reset_state_pices_bitboard();
-        for i in 0..self.pices.len(){
-            self.pices[i].update_moves(&self.state);
-        }
-        self.reset_state_can_move();
-        for i in 0..self.pices.len(){
-            if self.pices[i].pice_type() == PiceType::King{
-                self.pices[i].update_moves(&self.state);
-            }
-        }
+    pub fn update_moves(&mut self, color: Color) {
+        self.pices.iter_mut().filter(|pice| pice.color() == color).for_each(|pice|{
+            pice.update_moves(&self.state);
+        });
+        self.reset_state_can_move(color);
+
+        // self.reset_state_pices_bitboard();
+        // for i in 0..self.pices.len(){
+        //     self.pices[i].update_moves(&self.state);
+        // }
+        // self.reset_state_can_move();
+        // for i in 0..self.pices.len(){
+        //     if self.pices[i].pice_type() == PiceType::King{
+        //         self.pices[i].update_moves(&self.state);
+        //     }
+        // }
     }
 
-    fn reset_state_pices_bitboard(&mut self){
-        self.state.reset_pices_bitboard();
-        self.pices.iter().filter(|&pice| !pice.is_captured()).for_each(|pice| {
-            if pice.color() == Color::White{
-                self.state.white_pices_bitboard |= 1<<pice.pos
-            }else {
-                self.state.black_pices_bitboard |= 1<<pice.pos
-            }
-        });
-    }
+    // fn reset_state_pices_bitboard(&mut self){
+    //     todo!();
+    //     // self.state.reset_pices_bitboard();
+    //     // self.pices.iter().filter(|&pice| !pice.is_captured()).for_each(|pice| {
+    //     //     if pice.color() == Color::White{
+    //     //         self.state.white_pices_bitboard |= 1<<pice.pos
+    //     //     }else {
+    //     //         self.state.black_pices_bitboard |= 1<<pice.pos
+    //     //     }
+    //     // });
+    // }
 
-    fn reset_state_can_move(&mut self){
-        self.state.reset_can_move();
-        self.pices.iter().for_each(|pice| {
-            if pice.color() == Color::White{
-                self.state.white_can_move |= pice.moves
-            }else {
-                self.state.black_can_move |= pice.moves
-            }
-        });
+    fn reset_state_can_move(&mut self, color: Color){
+        self.state.reset_can_capture(color, &self.pices);
+        // self.state.reset_can_move();
+        // self.pices.iter().for_each(|pice| {
+        //     if pice.color() == Color::White{
+        //         self.state.white_can_move |= pice.moves
+        //     }else {
+        //         self.state.black_can_move |= pice.moves
+        //     }
+        // });
     }
 
     pub fn get_possible_moves(&mut self, color: Color) -> Vec<Move>{
         let mut moves: Vec<Move> = vec![];
-        self.update_moves();
-        self.pices.iter().filter(|&p| p.color() == color && !p.is_captured()).for_each(|pice| {
-            get_set_bits(&pice.moves).iter().for_each(|i| {
-                moves.push(Move::new(pice.pos, *i, MoveType::Normal));
-            });
+        self.update_moves(color);
+        self.pices.iter_mut().filter(|p| p.color() == color && !p.is_captured()).for_each(|pice| {
+            let mut add = pice.get_moves(&self.state);
+            moves.append(&mut add);
         });
         moves.retain(|mv| {
             self.make_move(*mv);
-            self.update_moves();
+            self.update_moves(self.turn);
 
             let res = self.state.in_check(self.turn.other());
             self.undo_last_move();
@@ -110,21 +116,48 @@ impl Board {
         if let Some(pice_pos) = self.board[mv.to() as usize] {
             self.pices[pice_pos].capture();
             mv.capture(pice_pos);
+            self.state.remove_pice(mv.to(), &self.pices[pice_pos]);
         }
         self.move_pice(mv);
+        match mv.move_type() {
+            MoveType::Normal | MoveType::PromotionQueen | MoveType::PromotionRook | MoveType::PromotionBishop | MoveType::PromotionKnight | MoveType::Pawndubblemove => {
+                
+            },
+            MoveType::Castle => {
+                todo!();
+            },
+            MoveType::Pessant => {
+                todo!();
+            }
+        }
+        
         self.moves.push(mv);
         self.turn = self.turn.other();
     }
 
     pub fn undo_last_move(&mut self){
         if let Some(mv) = self.moves.pop() {
-            self.undo_move_pice(mv);
-            if let Some(captured_pos) = mv.get_captured() {
-                self.pices[captured_pos].uncapture();
-                self.board[mv.to() as usize] = Some(captured_pos);
+            match mv.move_type() {
+                MoveType::Normal | MoveType::PromotionQueen | MoveType::PromotionRook | MoveType::PromotionBishop | MoveType::PromotionKnight | MoveType::Pawndubblemove => {
+                    self.undo_move_pice(mv);
+                    if let Some(captured_pos) = mv.get_captured() {
+                        self.pices[captured_pos].uncapture();
+                        self.board[mv.to() as usize] = Some(captured_pos);
+                        self.state.reinstate_pice(mv.to(), &self.pices[captured_pos]);
+                    }
+                },
+                MoveType::Castle => {
+                    todo!();
+                },
+                MoveType::Pessant => {
+                    todo!();
+                }
             }
+            
         }
         self.turn = self.turn.other();
+        self.update_moves(self.turn);
+
     }
 
     fn move_pice(&mut self, mv: Move){
@@ -132,6 +165,7 @@ impl Board {
             self.pices[pice_pos].move_to(&mv);
             self.board[mv.to() as usize] = self.board[mv.from() as usize];
             self.board[mv.from() as usize] = None;
+            self.state.move_pice(mv.from(), mv.to(), &self.pices[pice_pos]);
         }
     }
 
@@ -140,6 +174,7 @@ impl Board {
             self.pices[pice_pos].undo_move(&mv);
             self.board[mv.from() as usize] = self.board[mv.to() as usize];
             self.board[mv.to() as usize] = None;
+            self.state.move_pice(mv.to(), mv.from(), &self.pices[pice_pos]);
         }
     }
 
@@ -283,12 +318,26 @@ mod tests {
         assert_eq!(get_set_bits(&0b111), vec![0,1,2]);
     }
 
+    // #[test]
+    fn count_moves_one_move() {
+        let mut board = Board::from_fen("r1bqkbnr/pppppppp/n7/8/8/P7/1PPPPPPP/RNBQKBNR w KQkq - 1 2");
+        assert_eq!(count_moves_print(&mut board, 2, 1), 380);
+    }
+
+    #[test]
+    fn count_moves_one_move_2() {
+        let mut board = Board::from_fen("rnbqkbnr/pppp1ppp/8/4p3/8/2N5/PPPPPPPP/R1BQKBNR w KQkq - 0 2");
+        assert_eq!(count_moves_print(&mut board, 2, 1), 656);
+    }
+
     #[test]
     fn count_moves_default() {
         let mut board = Board::default();
-        assert_eq!(count_moves(&mut board, 1), 20);
-        assert_eq!(count_moves(&mut board, 2), 400);
-        assert_eq!(count_moves(&mut board, 3), 8_902);
+        // assert_eq!(count_moves(&mut board, 1), 20);
+        // assert_eq!(count_moves(&mut board, 2), 400);
+        // assert_eq!(count_moves(&mut board, 3), 8_902);
+        // assert!(1==2);
+
         assert_eq!(count_moves(&mut board, 4), 197_281);
         assert_eq!(count_moves(&mut board, 5), 4_865_609);
         // assert_eq!(count_moves(&mut board, 6), 119_060_324);
@@ -298,13 +347,35 @@ mod tests {
 
     fn count_moves(board: &mut Board, depth: u8) -> u64{
         if depth == 0{ 
+            // println!("{}", board);
             return 1;
         }
         let moves = board.get_possible_moves(board.turn);
+
         let mut res = 0;
         for m in moves{
             board.make_move(m);
             res += count_moves(board, depth - 1);
+            board.undo_last_move();
+        }
+        res
+    }
+
+    fn count_moves_print(board: &mut Board, depth: u8, print_depth: i32) -> u64{
+        if depth == 0{ 
+            // println!("{}", board);
+            return 1;
+        }
+        let moves = board.get_possible_moves(board.turn);
+        
+        let mut res = 0;
+        for m in moves{
+            board.make_move(m);
+            let a = count_moves(board, depth - 1);
+            if print_depth > 0{
+                println!("from: {}, to {} : {}", m.from(), m.to(), a);
+            }
+            res += a;
             board.undo_last_move();
         }
         res

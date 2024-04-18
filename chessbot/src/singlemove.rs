@@ -1,3 +1,4 @@
+#[derive(Debug)]
 pub enum MoveType {
     Normal = 0,
     Castle = 1,
@@ -5,7 +6,7 @@ pub enum MoveType {
     PromotionQueen = 3,
     PromotionRook = 4,
     PromotionBishop = 5,
-    PromotionHorse = 6,
+    PromotionKnight = 6,
     Pawndubblemove = 7,
 }
 
@@ -44,7 +45,8 @@ impl Move {
             i if i == MoveType::PromotionQueen as u16 => MoveType::PromotionQueen,
             i if i == MoveType::PromotionRook as u16 => MoveType::PromotionRook,
             i if i == MoveType::PromotionBishop as u16 => MoveType::PromotionBishop,
-            i if i == MoveType::PromotionHorse as u16 => MoveType::PromotionHorse,
+            i if i == MoveType::PromotionKnight as u16 => MoveType::PromotionKnight,
+            i if i == MoveType::Pawndubblemove as u16 => MoveType::Pawndubblemove,
             i => panic!("{} is not a valid move type flag", i)
         }
     }

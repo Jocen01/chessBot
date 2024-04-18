@@ -1,4 +1,4 @@
-use crate::Color;
+use crate::{pice::{self, Pice}, singlemove::Move, Color, PiceType};
 
 // can capture bitmap       2x
 // king bitmap / pos        2x
@@ -8,63 +8,211 @@ use crate::Color;
 // passant u8 / bitmap
 // castle rights
 
+pub enum CastleRights {
+    WhiteQueenside = 0,
+    WhiteKingside = 1,
+    BlackQueenside = 2,
+    BlackKingside = 3,
+}
+
+#[derive(Debug)]
+pub struct PiceBoards{
+    pub capture: u64,
+    pub king: u64,
+    pub diagonal_sliders: u64,
+    pub orthoganal_sliders: u64,
+    pub pawns: u64,
+    pub knights: u64
+}
+
+impl PiceBoards {
+    pub fn new(capture: u64, king: u64, diagonal_sliders: u64, orthoganal_sliders: u64, pawns: u64, horses: u64) -> PiceBoards{
+        PiceBoards {capture, king, diagonal_sliders, orthoganal_sliders, pawns, knights: horses}
+    }
+
+    pub fn default(color: Color) -> PiceBoards{
+        match color {
+            Color::White => {
+                PiceBoards{
+                    capture: (0b11111111)<<16,
+                    king: 0b10000,
+                    diagonal_sliders: 0b101100,
+                    orthoganal_sliders:0b10000001,
+                    pawns: (0b11111111)<<8,
+                    knights:0b1000010
+                }
+            },
+            Color::Black => {
+                PiceBoards{
+                    capture: (0b11111111)<<40,
+                    king: 0b10000<<56,
+                    diagonal_sliders: 0b101100<<56,
+                    orthoganal_sliders:0b10000001<<56,
+                    pawns: (0b11111111)<<48,
+                    knights:0b1000010<<56
+                }
+            }
+        }
+    }
+
+    pub fn empty() -> PiceBoards{
+        PiceBoards { capture: 0, king: 0, diagonal_sliders: 0, orthoganal_sliders: 0, pawns: 0, knights: 0 }
+    }
+
+    pub fn from_pices(pices: &Vec<&Pice>) -> PiceBoards{
+        let mut board = PiceBoards::empty();
+        pices.iter().for_each(|pice| {
+            match pice.pice_type() {
+                PiceType::King => board.king = 1<<pice.pos,
+                PiceType::Queen => {
+                    board.diagonal_sliders |= 1<<pice.pos; 
+                    board.orthoganal_sliders|=1<<pice.pos
+                },
+                PiceType::Rook => board.orthoganal_sliders|=1<<pice.pos,
+                PiceType::Bishop => board.diagonal_sliders |= 1<<pice.pos,
+                PiceType::Knight => board.knights |= 1<<pice.pos,
+                PiceType::Pawn => board.pawns |= 1<< pice.pos
+            }
+        });
+        board
+    }
+
+    pub fn pice_at(&self, pos: u8) -> bool{
+        (self.king | self.diagonal_sliders | self.orthoganal_sliders | self.pawns | self.knights) & (1<<pos) != 0
+    }
+
+    pub fn bitmap_all(&self) -> u64{
+        self.king | self.diagonal_sliders | self.orthoganal_sliders | self.pawns | self.knights
+    }
+
+    pub fn move_pice(&mut self, from: u8, to: u8, pice: &Pice){
+        match pice.pice_type() {
+            PiceType::King => self.king = 1<<to,
+            PiceType::Queen => {
+                self.diagonal_sliders ^= 1<<from; 
+                self.diagonal_sliders |= 1<<to; 
+                self.orthoganal_sliders^=1<<from;
+                self.orthoganal_sliders|=1<<to;
+            },
+            PiceType::Rook => {
+                self.orthoganal_sliders^=1<<from;
+                self.orthoganal_sliders|=1<<to;
+            },
+            PiceType::Bishop => {
+                self.diagonal_sliders^=1<<from;
+                self.diagonal_sliders|=1<<to;
+            },
+            PiceType::Knight => {
+                self.knights^=1<<from;
+                self.knights|=1<<to;
+            },
+            PiceType::Pawn => {
+                self.pawns^=1<<from;
+                self.pawns|=1<<to;
+            }
+        }
+    }
+
+    pub fn remove_pice(&mut self, pos: u8, pice: &Pice){
+        match pice.pice_type() {
+            PiceType::King => panic!("king can't be removed"),
+            PiceType::Queen => {
+                self.diagonal_sliders ^= 1<<pos; 
+                self.orthoganal_sliders^=1<<pos;
+            },
+            PiceType::Rook => {
+                self.orthoganal_sliders^=1<<pos;
+            },
+            PiceType::Bishop => {
+                self.diagonal_sliders^=1<<pos;
+            },
+            PiceType::Knight => {
+                self.knights^=1<<pos;
+            },
+            PiceType::Pawn => {
+                self.pawns^=1<<pos;
+            }
+        }
+    }
+
+    pub fn reinstate_pice(&mut self, pos: u8, pice: &Pice){
+        match pice.pice_type() {
+            PiceType::King => panic!("king can't be reinstated since it cant be removed'"),
+            PiceType::Queen => {
+                self.diagonal_sliders |= 1<<pos; 
+                self.orthoganal_sliders|=1<<pos;
+            },
+            PiceType::Rook => {
+                self.orthoganal_sliders|=1<<pos;
+            },
+            PiceType::Bishop => {
+                self.diagonal_sliders|=1<<pos;
+            },
+            PiceType::Knight => {
+                self.knights|=1<<pos;
+            },
+            PiceType::Pawn => {
+                self.pawns|=1<<pos;
+            }
+        }
+    }
+
+
+}
+
+#[derive(Debug)]
 pub struct State{
-    pub white_can_move: u64,
-    pub black_can_move: u64,
-    pub white_pices_bitboard: u64,
-    pub black_pices_bitboard: u64,
+    pub white: PiceBoards,
+    pub black: PiceBoards,
     pub passant: u64,
-    pub casle_rights: u8,
-    pub white_king: u8,
-    pub black_king: u8,
+    pub casle_rights: u8
 }
 
 impl State {
     pub fn new(
-            white_can_move: u64, 
-            black_can_move: u64, 
-            white_pices_bitboard: u64, 
-            black_pices_bitboard: u64, 
+            white: PiceBoards,
+            black: PiceBoards, 
             passant: u64, 
-            casle_rights: u8, 
-            white_king: u8, 
-            black_king: u8
+            casle_rights: u8,
         ) -> State{
         State {
-            white_can_move, 
-            black_can_move, 
-            white_pices_bitboard, 
-            black_pices_bitboard, 
+            white,
+            black,
             passant,
-            casle_rights,
-            white_king,
-            black_king            
+            casle_rights           
         }
     }
 
     pub fn default() -> State{
         State { 
-            white_can_move: 0, 
-            black_can_move: 0, 
-            white_pices_bitboard: 0, 
-            black_pices_bitboard: 0 , 
+            white: PiceBoards::default(Color::White), 
+            black: PiceBoards::default(Color::Black), 
             passant: 0, 
-            casle_rights: 0b1111,
-            white_king: 4,
-            black_king: 60
+            casle_rights: 0b1111
+        }
+    }
+
+    pub fn from_pices(pices: &Vec<Pice>, passant: u64, casle_rights: u8) -> State{
+        let white: Vec<&Pice> = pices.iter().filter(|pice| pice.color() == Color::White).collect();
+        let black: Vec<&Pice> = pices.iter().filter(|pice| pice.color() == Color::Black).collect();
+        State { 
+            white: PiceBoards::from_pices(&white), 
+            black: PiceBoards::from_pices(&black), 
+            passant, 
+            casle_rights
         }
     }
 
     pub fn pice_at(&self, pos: u8) -> bool{
-        (self.white_pices_bitboard | self.black_pices_bitboard) & (1<<pos) != 0
+        self.white.pice_at(pos) || self.black.pice_at(pos)
     }
 
     pub fn white_at(&self, pos: u8) -> bool{
-        self.white_pices_bitboard & (1<<pos) != 0
+        self.white.pice_at(pos)
     }
 
     pub fn black_at(&self, pos: u8) -> bool{
-        self.black_pices_bitboard & (1<<pos) != 0
+        self.black.pice_at(pos)
     }
 
     pub fn color_at(&self, pos: u8, color: Color) -> bool{
@@ -81,14 +229,37 @@ impl State {
         }
     }
 
-    pub fn reset_pices_bitboard(&mut self){
-        self.white_pices_bitboard = 0;
-        self.black_pices_bitboard = 0;
-    }
+    // pub fn reset_pices_bitboard(&mut self){
+    //     self.white_pices_bitboard = 0;
+    //     self.black_pices_bitboard = 0;
+    // }
 
-    pub fn reset_can_move(&mut self){
-        self.white_can_move = 0;
-        self.black_can_move = 0;
+    // pub fn move_picetype(&mut self, pice: &Pice) {
+    //     match pice.color() {
+    //         Color::White => {
+    //             match pice.pice_type() {
+    //                 PiceType::King => self.white.king = 1<<pice.pos,
+    //                 PiceType::Knight => self.white.horses 
+    //             }
+    //         }
+    //     }
+    // }
+
+    pub fn reset_can_capture(&mut self, color: Color, pices: &Vec<Pice>){
+        match color {
+            Color::White => {
+                self.white.capture = 0;
+                pices.iter().filter(|pice| pice.color() == color).for_each(|pice| {
+                    self.white.capture |= pice.moves;
+                })
+            },
+            Color::Black => {
+                self.black.capture = 0;
+                pices.iter().filter(|pice| pice.color() == color).for_each(|pice| {
+                    self.black.capture |= pice.moves;
+                })
+            }
+        }
     }
 
     pub fn passant_at(&self, pos: u8) -> bool{
@@ -97,8 +268,44 @@ impl State {
 
     pub fn in_check(&self, color: Color) -> bool{
         match color {
-            Color::White => (1<<self.white_king) & self.black_can_move != 0,
-            Color::Black => (1<<self.black_king) & self.white_can_move != 0
+            Color::White => self.white.king & self.black.capture != 0,
+            Color::Black => self.black.king & self.white.capture != 0
+        }
+    }
+
+    pub fn piceboards(&self, color: Color) -> &PiceBoards{
+        match color {
+            Color::White => &self.white,
+            Color::Black => &self.black,
+        }
+    }
+
+    pub fn casle_right(&self, side: CastleRights) -> bool{
+        self.casle_rights & (1 << (side as u8)) != 0
+    }
+
+    pub fn remove_casle_right(&mut self, side: CastleRights){
+        self.casle_rights &= !(1 << (side as u8));
+    }
+
+    pub fn move_pice(&mut self, from: u8, to: u8, pice: &Pice){
+        match pice.color() {
+            Color::White => self.white.move_pice(from, to, pice),
+            Color::Black => self.black.move_pice(from, to, pice),
+        }
+    }
+
+    pub fn remove_pice(&mut self, pos: u8, pice: &Pice){
+        match pice.color() {
+            Color::White => self.white.remove_pice(pos, pice),
+            Color::Black => self.black.remove_pice(pos, pice),
+        }
+    }
+
+    pub fn reinstate_pice(&mut self, pos: u8, pice: &Pice){
+        match pice.color() {
+            Color::White => self.white.reinstate_pice(pos, pice),
+            Color::Black => self.black.reinstate_pice(pos, pice),
         }
     }
 }
