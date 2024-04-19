@@ -1,4 +1,6 @@
-use crate::{pice::{self, Pice}, singlemove::Move, Color, PiceType};
+use crate::{pice::Pice, Color, PiceType};
+// use strum::IntoEnumIterator; // 0.17.1
+// use strum_macros::EnumIter; // 0.17.1
 
 // can capture bitmap       2x
 // king bitmap / pos        2x
@@ -8,11 +10,18 @@ use crate::{pice::{self, Pice}, singlemove::Move, Color, PiceType};
 // passant u8 / bitmap
 // castle rights
 
+#[derive(Debug, Clone, Copy)]
 pub enum CastleRights {
     WhiteQueenside = 0,
     WhiteKingside = 1,
     BlackQueenside = 2,
     BlackKingside = 3,
+}
+
+impl CastleRights {
+    pub fn iter() -> Vec<CastleRights>{
+        vec![CastleRights::WhiteQueenside, CastleRights::WhiteKingside, CastleRights::BlackQueenside, CastleRights::BlackKingside]
+    }
 }
 
 #[derive(Debug)]
@@ -74,6 +83,7 @@ impl PiceBoards {
                 PiceType::Pawn => board.pawns |= 1<< pice.pos
             }
         });
+        assert!(board.pawns.count_ones() <= 8);
         board
     }
 
@@ -107,8 +117,13 @@ impl PiceBoards {
                 self.knights|=1<<to;
             },
             PiceType::Pawn => {
+                let pre = self.pawns.clone();
                 self.pawns^=1<<from;
                 self.pawns|=1<<to;
+                if self.pawns.count_ones() > 8{
+                    println!("{:?}, moves2 {}, {}, pre {}", self, from, to, pre);
+                    assert!(1==2);
+                }
             }
         }
     }
@@ -152,7 +167,13 @@ impl PiceBoards {
                 self.knights|=1<<pos;
             },
             PiceType::Pawn => {
+                if self.pawns.count_ones() > 8{
+                    println!("{:?}, prepawns1 ", self);
+                }
                 self.pawns|=1<<pos;
+                if self.pawns.count_ones() > 8{
+                    println!("{:?}, prepawns ", self);
+                }
             }
         }
     }
@@ -249,13 +270,13 @@ impl State {
         match color {
             Color::White => {
                 self.white.capture = 0;
-                pices.iter().filter(|pice| pice.color() == color).for_each(|pice| {
+                pices.iter().filter(|pice| pice.color() == color && !pice.is_captured()).for_each(|pice| {
                     self.white.capture |= pice.moves;
                 })
             },
             Color::Black => {
                 self.black.capture = 0;
-                pices.iter().filter(|pice| pice.color() == color).for_each(|pice| {
+                pices.iter().filter(|pice| pice.color() == color && !pice.is_captured()).for_each(|pice| {
                     self.black.capture |= pice.moves;
                 })
             }
@@ -284,8 +305,18 @@ impl State {
         self.casle_rights & (1 << (side as u8)) != 0
     }
 
-    pub fn remove_casle_right(&mut self, side: CastleRights){
-        self.casle_rights &= !(1 << (side as u8));
+    pub fn remove_casle_right(&mut self, side: CastleRights) -> bool{
+        let mask = 1 << (side as u8);
+        if self.casle_rights & mask != 0{
+            self.casle_rights &= !mask;
+            true
+        }else {
+            false
+        }
+    }
+
+    pub fn reinstate_casle_right(&mut self, side: CastleRights){
+        self.casle_rights |= 1<< (side as u8);
     }
 
     pub fn move_pice(&mut self, from: u8, to: u8, pice: &Pice){

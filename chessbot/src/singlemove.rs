@@ -1,4 +1,8 @@
-#[derive(Debug)]
+use std::fmt;
+
+use crate::state::CastleRights;
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub enum MoveType {
     Normal = 0,
     Castle = 1,
@@ -10,15 +14,21 @@ pub enum MoveType {
     Pawndubblemove = 7,
 }
 
-#[derive(Clone, Copy, Debug)]
+impl MoveType {
+    pub fn iter_promotions() -> Vec<MoveType>{
+        vec![MoveType::PromotionQueen, MoveType::PromotionRook, MoveType::PromotionBishop, MoveType::PromotionKnight]
+    }
+}
+
+#[derive(Clone, Copy)]
 pub struct Move{
-    value: u16, // FFFFfffffftttttt = Flag, from, to
+    value: u32, // FFFFCCCCfffffftttttt = Flag, Castle rights removed, from, to
     captured: Option<usize>
 }
 
 impl Move {
         pub fn new(from: u8, to: u8, move_type: MoveType) -> Move {
-        Move {value: (to as u16)  | (from as u16) << 6 | (move_type as u16) << 12, captured: None}
+        Move {value: (to as u32)  | (from as u32) << 6 | (move_type as u32) << 16, captured: None}
     }
 
     pub fn capture(&mut self, pice: usize){
@@ -38,16 +48,46 @@ impl Move {
     }
 
     pub fn move_type(&self) -> MoveType{
-        match self.value >> 12 {
-            i if i == MoveType::Normal as u16 => MoveType::Normal,
-            i if i == MoveType::Castle as u16 => MoveType::Castle,
-            i if i == MoveType::Pessant as u16 => MoveType::Pessant,
-            i if i == MoveType::PromotionQueen as u16 => MoveType::PromotionQueen,
-            i if i == MoveType::PromotionRook as u16 => MoveType::PromotionRook,
-            i if i == MoveType::PromotionBishop as u16 => MoveType::PromotionBishop,
-            i if i == MoveType::PromotionKnight as u16 => MoveType::PromotionKnight,
-            i if i == MoveType::Pawndubblemove as u16 => MoveType::Pawndubblemove,
+        match self.value >> 16 {
+            i if i == MoveType::Normal as u32 => MoveType::Normal,
+            i if i == MoveType::Castle as u32 => MoveType::Castle,
+            i if i == MoveType::Pessant as u32 => MoveType::Pessant,
+            i if i == MoveType::PromotionQueen as u32 => MoveType::PromotionQueen,
+            i if i == MoveType::PromotionRook as u32 => MoveType::PromotionRook,
+            i if i == MoveType::PromotionBishop as u32 => MoveType::PromotionBishop,
+            i if i == MoveType::PromotionKnight as u32 => MoveType::PromotionKnight,
+            i if i == MoveType::Pawndubblemove as u32 => MoveType::Pawndubblemove,
             i => panic!("{} is not a valid move type flag", i)
         }
+    }
+
+    pub fn remove_casle_right(&mut self, castle_rights: CastleRights){
+        self.value |= 1<<(12 + (castle_rights as u8));
+    }
+
+    pub fn get_removed_castlerights(&self) -> Option<Vec<CastleRights>>{
+        if (self.value >> 12) & 0b1111 != 0{
+            let mut res = vec![];
+            for castle_right in CastleRights::iter(){
+                if self.value & 1<<(12 + (castle_right as u8)) != 0{
+                    res.push(castle_right);
+                }
+            }
+            Some(res)
+        }else {
+            None
+        }
+    }
+}
+
+impl fmt::Debug for Move {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Move: {{ move_type: {:?}, from: {}, to: {} }}", self.move_type(), self.from(), self.to())
+    }
+}
+
+impl fmt::Display for Move {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(f, "Move: {{ move_type: {:?}, from: {}, to: {} }}", self.move_type(), self.from(), self.to())
     }
 }

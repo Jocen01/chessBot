@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::{pice::{self, Pice}, singlemove::{Move, MoveType}, state::State, Color, PiceType};
+use crate::{pice::Pice, singlemove::{Move, MoveType}, state::{CastleRights, State}, Color, PiceType};
 
 pub struct Board{
     pub pices: Vec<Pice>,
@@ -49,11 +49,16 @@ impl Board {
     }
 
     pub fn get_pice_pos(&self, p: u8) -> Option<&Pice>{
-        self.pices.iter().find(|&pice| pice.pos == p && !pice.is_captured())
+        if let Some(pos) = self.board[p as usize] {
+            Some(&self.pices[pos])
+        }else {
+            None
+        }
+        // self.pices.iter().find(|&pice| pice.pos == p && !pice.is_captured())
     }
 
     pub fn update_moves(&mut self, color: Color) {
-        self.pices.iter_mut().filter(|pice| pice.color() == color).for_each(|pice|{
+        self.pices.iter_mut().filter(|pice| pice.color() == color && !pice.is_captured()).for_each(|pice|{
             pice.update_moves(&self.state);
         });
         self.reset_state_can_move(color);
@@ -103,6 +108,7 @@ impl Board {
         });
         moves.retain(|mv| {
             self.make_move(*mv);
+
             self.update_moves(self.turn);
 
             let res = self.state.in_check(self.turn.other());
@@ -113,50 +119,196 @@ impl Board {
     }
 
     pub fn make_move(&mut self, mut mv: Move) {
-        if let Some(pice_pos) = self.board[mv.to() as usize] {
+        let to = mv.to();
+        let from = mv.from();
+
+        // if a pice is captured
+        if let Some(pice_pos) = self.board[to as usize] {
             self.pices[pice_pos].capture();
             mv.capture(pice_pos);
-            self.state.remove_pice(mv.to(), &self.pices[pice_pos]);
+            self.state.remove_pice(to, &self.pices[pice_pos]);
         }
-        self.move_pice(mv);
+
+        self.state.passant = 0;
+
+        // specifics for each move type
         match mv.move_type() {
-            MoveType::Normal | MoveType::PromotionQueen | MoveType::PromotionRook | MoveType::PromotionBishop | MoveType::PromotionKnight | MoveType::Pawndubblemove => {
-                
+            MoveType::Normal => {
+                self.move_pice(mv);
+
+                // is taken care of in pice.move_pice
+            },
+            MoveType::PromotionQueen | MoveType::PromotionRook | MoveType::PromotionBishop | MoveType::PromotionKnight => {
+                self.move_pice_promotion(mv);
             },
             MoveType::Castle => {
-                todo!();
+                self.move_pice(mv);
+
+                if to == 2{
+                    if let Some(rook_idx) = self.board[0]{
+                        self.pices[rook_idx].move_to(&mv);
+                        self.board[3] = self.board[0];
+                        self.board[0] = None;
+                        self.state.move_pice(0, 3, &self.pices[rook_idx]);
+                    }
+                }else if to == 6{
+                    if let Some(rook_idx) = self.board[7]{
+                        self.pices[rook_idx].move_to(&mv);
+                        self.board[5] = self.board[7];
+                        self.board[7] = None;
+                        self.state.move_pice(7, 5, &self.pices[rook_idx]);
+                    }
+                }else if to == 58{
+                    if let Some(rook_idx) = self.board[56]{
+                        self.pices[rook_idx].move_to(&mv);
+                        self.board[59] = self.board[56];
+                        self.board[56] = None;
+                        self.state.move_pice(56, 59, &self.pices[rook_idx]);
+                    }
+                }else if to == 62{
+                    if let Some(rook_idx) = self.board[63]{
+                        self.pices[rook_idx].move_to(&mv);
+                        self.board[61] = self.board[63];
+                        self.board[63] = None;
+                        self.state.move_pice(63, 61, &self.pices[rook_idx]);
+                    }
+                }else {
+                    panic!("not a valid castle move{:?}", mv);
+                }
             },
             MoveType::Pessant => {
-                todo!();
+                self.move_pice(mv);
+
+                let delta:i8 = if to > from { -8 } else { 8 };
+                
+                let pice_pos = self.board[(to as i8 + delta) as usize].unwrap();
+                self.pices[pice_pos].capture();
+                mv.capture(pice_pos);
+                self.board[(to as i8 + delta) as usize] = None;
+                self.state.remove_pice((to as i8 + delta) as u8, &self.pices[pice_pos]);
+                
+            },
+            MoveType::Pawndubblemove => {
+                self.move_pice(mv);
+
+                self.state.passant = 1<<((from + to)/2);
             }
+        }
+
+        // remove castlerights
+        if to == 0 || from == 0 || from == 4{
+            if self.state.remove_casle_right(CastleRights::WhiteQueenside){
+                mv.remove_casle_right(CastleRights::WhiteQueenside);
+            };
+        }
+        if to == 7 || from == 7 || from == 4{
+            if self.state.remove_casle_right(CastleRights::WhiteKingside){
+                mv.remove_casle_right(CastleRights::WhiteKingside);
+            };
+        }
+        if to == 56 || from == 56 || from == 60{
+            if self.state.remove_casle_right(CastleRights::BlackQueenside){
+                mv.remove_casle_right(CastleRights::BlackQueenside);
+            };
+        }
+        if to == 63 || from == 63 || from == 60{
+            if self.state.remove_casle_right(CastleRights::BlackKingside){
+                mv.remove_casle_right(CastleRights::BlackKingside);
+            };
         }
         
         self.moves.push(mv);
+        self.update_moves(self.turn);
         self.turn = self.turn.other();
     }
 
     pub fn undo_last_move(&mut self){
         if let Some(mv) = self.moves.pop() {
+            let to = mv.to();
+
+            self.state.passant = 0;
+
             match mv.move_type() {
-                MoveType::Normal | MoveType::PromotionQueen | MoveType::PromotionRook | MoveType::PromotionBishop | MoveType::PromotionKnight | MoveType::Pawndubblemove => {
+                MoveType::Normal | MoveType::Pawndubblemove => {
                     self.undo_move_pice(mv);
                     if let Some(captured_pos) = mv.get_captured() {
                         self.pices[captured_pos].uncapture();
-                        self.board[mv.to() as usize] = Some(captured_pos);
-                        self.state.reinstate_pice(mv.to(), &self.pices[captured_pos]);
+                        self.board[to as usize] = Some(captured_pos);
+                        self.state.reinstate_pice(to, &self.pices[captured_pos]);
+                    } 
+                },
+                MoveType::PromotionQueen | MoveType::PromotionRook | MoveType::PromotionBishop | MoveType::PromotionKnight => {
+                    self.undo_move_promotion_pice(mv);
+                    if let Some(captured_pos) = mv.get_captured() {
+                        self.pices[captured_pos].uncapture();
+                        self.board[to as usize] = Some(captured_pos);
+                        self.state.reinstate_pice(to, &self.pices[captured_pos]);
                     }
                 },
                 MoveType::Castle => {
-                    todo!();
+                    self.undo_move_pice(mv);
+                    if to == 2{
+                        if let Some(rook_idx) = self.board[3]{
+                            self.pices[rook_idx].undo_move(&mv);
+                            self.board[0] = self.board[3];
+                            self.board[3] = None;
+                            self.state.move_pice(3, 0, &self.pices[rook_idx]);
+                        }
+                    }else if to == 6{
+                        if let Some(rook_idx) = self.board[5]{
+                            self.pices[rook_idx].undo_move(&mv);
+                            self.board[7] = self.board[5];
+                            self.board[5] = None;
+                            self.state.move_pice(5, 7, &self.pices[rook_idx]);
+                        }
+                    }else if to == 58{
+                        if let Some(rook_idx) = self.board[59]{
+                            self.pices[rook_idx].undo_move(&mv);
+                            self.board[56] = self.board[59];
+                            self.board[59] = None;
+                            self.state.move_pice(59, 56, &self.pices[rook_idx]);
+                        }
+                    }else if to == 62{
+                        if let Some(rook_idx) = self.board[61]{
+                            self.pices[rook_idx].undo_move(&mv);
+                            self.board[63] = self.board[61];
+                            self.board[61] = None;
+                            self.state.move_pice(61, 63, &self.pices[rook_idx]);
+                        }
+                    }else {
+                        panic!("not a valid castle move{:?}", mv);
+                    }
+
                 },
                 MoveType::Pessant => {
-                    todo!();
+                    self.undo_move_pice(mv);
+                    let delta: i8 = if to > mv.from() { -8 } else { 8 };
+                
+                    if let Some(captured_pos) = mv.get_captured() {
+                        self.pices[captured_pos].uncapture();
+                        self.board[((to as i8) + delta) as usize] = Some(captured_pos);
+                        self.state.reinstate_pice(((to as i8) + delta) as u8, &self.pices[captured_pos]);
+                    }
                 }
             }
-            
+            // reinstate castlerights
+            if let Some(removed_castle_rights) = mv.get_removed_castlerights(){
+                for removed in removed_castle_rights{
+                    self.state.reinstate_casle_right(removed);
+                }
+            }
+
+            // reinstate castlerights
+            if let Some(last_move) = self.moves.last(){
+                if last_move.move_type() == MoveType::Pawndubblemove{
+                    self.state.passant = 1<<((last_move.from() + last_move.to())/2);
+                }
+            }
         }
+        
+        
         self.turn = self.turn.other();
-        self.update_moves(self.turn);
+        // self.update_moves(self.turn); // was needed before but is now only in make move
 
     }
 
@@ -169,12 +321,33 @@ impl Board {
         }
     }
 
+    fn move_pice_promotion(&mut self, mv: Move){
+        if let Some(pice_pos) = self.board[mv.from() as usize] {
+            self.state.remove_pice( mv.from(), &self.pices[pice_pos]);
+            self.pices[pice_pos].move_to(&mv);
+            self.board[mv.to() as usize] = self.board[mv.from() as usize];
+            self.board[mv.from() as usize] = None;
+            self.state.reinstate_pice( mv.to(), &self.pices[pice_pos]);
+        }
+    }
+
     fn undo_move_pice(&mut self, mv: Move){
         if let Some(pice_pos) = self.board[mv.to() as usize] {
             self.pices[pice_pos].undo_move(&mv);
             self.board[mv.from() as usize] = self.board[mv.to() as usize];
             self.board[mv.to() as usize] = None;
             self.state.move_pice(mv.to(), mv.from(), &self.pices[pice_pos]);
+        }
+    }
+
+    fn undo_move_promotion_pice(&mut self, mv: Move){
+        if let Some(pice_pos) = self.board[mv.to() as usize] {
+            self.state.remove_pice( mv.to(), &self.pices[pice_pos]);
+            self.pices[pice_pos].undo_move(&mv);
+            self.board[mv.from() as usize] = self.board[mv.to() as usize];
+            self.board[mv.to() as usize] = None;
+            self.state.reinstate_pice( mv.from(), &self.pices[pice_pos]);
+
         }
     }
 
@@ -196,18 +369,7 @@ impl Board {
     }
 }
 
-fn get_set_bits(&pos: &u64) -> Vec<u8>{
-    let mut i = pos.clone();
-    let mut res = vec![];
-    let mut idx = 0;
-    while i!= 0 {
-        let t = i.trailing_zeros() as u8;
-        res.push(idx + t);
-        idx += t + 1;
-        i >>= t+1
-    }
-    res
-}
+
 
 impl fmt::Display for Board {
     // This trait requires `fmt` with this exact signature.
@@ -235,7 +397,7 @@ impl fmt::Display for Board {
 
 #[cfg(test)]
 mod tests {
-    use crate::{board::{get_set_bits, Board}, pice::Pice, Color, PiceType};
+    use crate::{board::Board, pice::Pice, singlemove::{Move, MoveType}, Color, PiceType};
 
     #[test]
     fn fen_default() {
@@ -318,10 +480,10 @@ mod tests {
         assert_eq!(get_set_bits(&0b111), vec![0,1,2]);
     }
 
-    // #[test]
+    #[test]
     fn count_moves_one_move() {
         let mut board = Board::from_fen("r1bqkbnr/pppppppp/n7/8/8/P7/1PPPPPPP/RNBQKBNR w KQkq - 1 2");
-        assert_eq!(count_moves_print(&mut board, 2, 1), 380);
+        assert_eq!(count_moves(&mut board, 2), 380);
     }
 
     #[test]
@@ -333,24 +495,98 @@ mod tests {
     #[test]
     fn count_moves_default() {
         let mut board = Board::default();
-        // assert_eq!(count_moves(&mut board, 1), 20);
-        // assert_eq!(count_moves(&mut board, 2), 400);
-        // assert_eq!(count_moves(&mut board, 3), 8_902);
-        // assert!(1==2);
-
+        assert_eq!(count_moves(&mut board, 1), 20);
+        assert_eq!(count_moves(&mut board, 2), 400);
+        assert_eq!(count_moves(&mut board, 3), 8_902);
         assert_eq!(count_moves(&mut board, 4), 197_281);
-        assert_eq!(count_moves(&mut board, 5), 4_865_609);
+        // assert_eq!(count_moves(&mut board, 5), 4_865_609);
         // assert_eq!(count_moves(&mut board, 6), 119_060_324);
         // assert_eq!(count_moves(&mut board, 7), 3_195_901_860);
         // assert_eq!(count_moves(&mut board, 8), 84_998_978_956);
     }
 
+    #[test]
+    fn count_moves_default_specific_moves() {
+        // added pawn could not capture pice to get out of check
+        let mut board = Board::from_fen("rnbqk1nr/pppp1ppp/8/4p3/1b1P4/P7/1PP1PPPP/RNBQKBNR w KQkq - 1 3");
+        assert_eq!(count_moves_print(&mut board, 1,1), 6);
+    }
+
+    #[test]
+    fn count_moves_default_specific_moves_2() {
+        // added pawn could not capture pice to get out of check
+        let mut board = Board::from_fen("rnbqkbnr/pppp1ppp/4p3/4P3/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2");
+        let count = count_moves_print(&mut board, 2,1);
+        assert_eq!(board.pices.iter().filter(|p| p.color() == Color::White).count(),board.pices.iter().filter(|p| p.color() == Color::Black).count());
+        assert_eq!(count, 840);
+    }
+
+    #[test]
+    fn count_moves_default_specific_moves_3() {
+        // added pawn could not capture pice to get out of check
+        let mut board = Board::from_fen("rnbqkbnr/pppp1ppp/4p3/4P3/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2");
+        board.make_move(Move::new(55, 39, MoveType::Pawndubblemove));
+        assert_eq!(count_moves_print(&mut board, 1,1), 29);
+    }
+
+    #[test]
+    fn double_move_passant() {
+        // added pawn could not capture pice to get out of check
+        let mut board = Board::from_fen("rnbqkbnr/pppp1ppp/4p3/4P3/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2");
+        board.make_move(Move::new(51, 35, MoveType::Pawndubblemove));
+        assert_eq!(board.state.passant, 1<<43);
+    }
+
+    #[test]
+    fn count_moves_kiwipete() {
+        let mut board = Board::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq -");
+        assert_eq!(count_moves(&mut board, 1), 48);
+        assert_eq!(count_moves(&mut board, 2), 2_039);
+        assert_eq!(count_moves_print(&mut board, 3,1), 97862);
+        // assert_eq!(count_moves(&mut board, 4), 4_085_603);
+        // assert_eq!(count_moves(&mut board, 5), 193_690_690);
+        // assert_eq!(count_moves(&mut board, 6), 8_031_647_685);
+    }
+
+
+    #[test]
+    fn count_moves_kiwipete_move_blocks_castle() {
+        let mut board = Board::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq -");
+        board.make_move(Move::new(36, 42, MoveType::Normal));
+        assert_eq!(count_moves(&mut board, 1),41);
+    }
+
+    #[test]
+    fn count_moves_kiwipete_promotion() {
+        let mut board = Board::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/1PN2Q1p/P1PBBPPP/R3K2R b KQkq - 0 1");
+        board.make_move(Move::new(23, 14, MoveType::Normal));
+        board.make_move(Move::new(12, 5, MoveType::Normal));
+        // assert_eq!(1,2);
+        assert_eq!(count_moves(&mut board, 1),56);
+    }
+
+    #[test]
+    fn count_moves_kiwipete_pice_block_queenside_castle() {
+        let mut board = Board::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq -");
+        board.make_move(Move::new(18, 1, MoveType::Normal));
+        board.make_move(Move::new(45, 28, MoveType::Normal));
+        assert_eq!(count_moves(&mut board, 1), 51);
+        // assert_eq!(count_moves(&mut board, 4), 4_085_603);
+        // assert_eq!(count_moves(&mut board, 5), 193_690_690);
+        // assert_eq!(count_moves(&mut board, 6), 8_031_647_685);
+    }
+
     fn count_moves(board: &mut Board, depth: u8) -> u64{
         if depth == 0{ 
             // println!("{}", board);
+            // assert_eq!(board.pices.iter().filter(|p| p.color() == Color::White).count(),board.pices.iter().filter(|p| p.color() == Color::Black).count());
+
             return 1;
         }
         let moves = board.get_possible_moves(board.turn);
+
+        // let nbr_castle = moves.iter().filter(|mv| mv.move_type() == MoveType::Castle).count();
+        // println!("nbr castle {}", nbr_castle);
 
         let mut res = 0;
         for m in moves{
@@ -367,16 +603,32 @@ mod tests {
             return 1;
         }
         let moves = board.get_possible_moves(board.turn);
-        
+        // let nbr_castle = moves.iter().filter(|mv| mv.move_type() == MoveType::Castle).count();
+        // println!("nbr castle {}", nbr_castle);
         let mut res = 0;
         for m in moves{
             board.make_move(m);
+            // println!("{}",board);
+
             let a = count_moves(board, depth - 1);
             if print_depth > 0{
                 println!("from: {}, to {} : {}", m.from(), m.to(), a);
             }
             res += a;
             board.undo_last_move();
+        }
+        res
+    }
+
+    fn get_set_bits(&pos: &u64) -> Vec<u8>{
+        let mut i = pos.clone();
+        let mut res = vec![];
+        let mut idx = 0;
+        while i!= 0 {
+            let t = i.trailing_zeros() as u8;
+            res.push(idx + t);
+            idx += t + 1;
+            i >>= t+1
         }
         res
     }

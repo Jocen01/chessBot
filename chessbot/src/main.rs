@@ -7,7 +7,7 @@ mod constants;
 mod state;
 
 
-#[derive(Debug,PartialEq)]
+#[derive(Debug,PartialEq, Clone, Copy)]
 pub enum PiceType {
     King = 6,
     Queen = 5,
