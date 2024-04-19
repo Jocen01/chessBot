@@ -308,7 +308,7 @@ impl Board {
         
         
         self.turn = self.turn.other();
-        // self.update_moves(self.turn); // was needed before but is now only in make move
+        self.update_moves(self.turn); // was needed before but is now only in make move
 
     }
 
@@ -541,9 +541,12 @@ mod tests {
     fn count_moves_kiwipete() {
         let mut board = Board::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq -");
         assert_eq!(count_moves(&mut board, 1), 48);
+        println!("state {:?}", board.state);
         assert_eq!(count_moves(&mut board, 2), 2_039);
+        println!("state {:?}", board.state);
         assert_eq!(count_moves_print(&mut board, 3,1), 97862);
-        // assert_eq!(count_moves(&mut board, 4), 4_085_603);
+        println!("state {:?}", board.state);
+        assert_eq!(count_moves(&mut board, 4), 4_085_603);
         // assert_eq!(count_moves(&mut board, 5), 193_690_690);
         // assert_eq!(count_moves(&mut board, 6), 8_031_647_685);
     }
@@ -574,6 +577,14 @@ mod tests {
         // assert_eq!(count_moves(&mut board, 4), 4_085_603);
         // assert_eq!(count_moves(&mut board, 5), 193_690_690);
         // assert_eq!(count_moves(&mut board, 6), 8_031_647_685);
+    }
+
+    #[test]
+    fn count_moves_kiwipete_pawn_capture_blocks_castle() {
+        let mut board = Board::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq -");
+        board.make_move(Move::new(11, 29, MoveType::Normal));
+        board.make_move(Move::new(23, 14, MoveType::Normal));
+        assert_eq!(count_moves(&mut board, 1), 45);
     }
 
     fn count_moves(board: &mut Board, depth: u8) -> u64{

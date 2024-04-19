@@ -1,4 +1,4 @@
-use crate::{constants, singlemove::{Move, MoveType}, state::{CastleRights, State}, Color, PiceType};
+use crate::{constants, singlemove::{Move, MoveType}, state::{self, CastleRights, State}, Color, PiceType};
 
 
 const CAPTURE_BIT: u8 = 5;
@@ -174,7 +174,7 @@ impl Pice {
                 if blockers & QUEENSIDE_CASTLE_MASK_CAPTURE ==0 && pices & QUEENSIDE_CASTLE_MASK_PICES ==0 && state.casle_right(CastleRights::WhiteQueenside){
                     moves.push(Move::new(self.pos, 2, MoveType::Castle));
                 }
-                if blockers & KINGSIDE_CASTLE_MASK ==0 && state.casle_right(CastleRights::WhiteKingside){
+                if blockers & KINGSIDE_CASTLE_MASK == 0 && state.casle_right(CastleRights::WhiteKingside){
                     moves.push(Move::new(self.pos, 6, MoveType::Castle));
                 }
             }           
@@ -244,14 +244,14 @@ impl Pice {
             //     moves |= 1<<(self.pos + 16);
             // }
             if self.pos & 0b111 != 0{
-                if state.black_at(self.pos + 7) || state.passant_at(self.pos + 7) {
+                // if state.black_at(self.pos + 7) || state.passant_at(self.pos + 7) {
                     moves |= 1<<(self.pos + 7);
-                } 
+                // } 
             }
             if self.pos & 0b111 != 7{
-                if state.black_at(self.pos + 9) || state.passant_at(self.pos + 9) {
+                // if state.black_at(self.pos + 9) || state.passant_at(self.pos + 9) {
                     moves |= 1<<(self.pos + 9);
-                } 
+                // } 
             }
         } else {
             // if !state.pice_at(self.pos - 8){
@@ -261,14 +261,14 @@ impl Pice {
             //     moves |= 1<<(self.pos - 16);
             // }
             if self.pos & 0b111 != 0{
-                if state.white_at(self.pos - 9) || state.passant_at(self.pos - 9){
+                // if state.white_at(self.pos - 9) || state.passant_at(self.pos - 9){
                     moves |= 1<<(self.pos - 9);
-                } 
+                // } 
             }
             if self.pos & 0b111 != 7{
-                if state.white_at(self.pos - 7) || state.passant_at(self.pos - 7) {
+                // if state.white_at(self.pos - 7) || state.passant_at(self.pos - 7) {
                     moves |= 1<<(self.pos - 7);
-                } 
+                // } 
             }
         }
         self.moves = moves;
@@ -481,23 +481,33 @@ impl Pice {
     }
 }
 
-fn get_set_bits(&pos: &u64) -> Vec<u8>{
-    let mut i = pos.clone();
-    let mut res = vec![];
-    let mut idx = 0;
-    while i!= 0 {
-        let t = i.trailing_zeros() as u8;
-        res.push(idx + t);
-        idx += t + 1;
-        i >>= t+1
-    }
-    res
+fn get_set_bits(pos: &u64) -> Vec<u8>{
+    if *pos == ((1 as u64)<<63){
+        vec![63]
+    }else {
+        let mut i = pos.clone();
+        let mut res = vec![];
+        let mut idx = 0;
+        while i!= 0 {
+            let t = i.trailing_zeros() as u8;
+            res.push(idx + t);
+            idx += t + 1;
+            i >>= t+1
+        }
+        res
+    } 
 }
 
 
 #[cfg(test)]
 mod tests {
-    use crate::{board::Board, pice::Pice, vec_pos_to_bitmap, Color, PiceType};
+    use crate::{board::Board, pice::Pice, vec_pos_to_bitmap, Color, PiceType, pice::get_set_bits};
+
+    #[test]
+    fn get_set_bits_63(){
+        let i: u64 = 1;
+        get_set_bits(&(i<<63));
+    }
 
     // #[test]
     fn white_pawn_moves_default_board() {
