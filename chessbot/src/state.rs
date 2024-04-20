@@ -22,6 +22,22 @@ impl CastleRights {
     pub fn iter() -> Vec<CastleRights>{
         vec![CastleRights::WhiteQueenside, CastleRights::WhiteKingside, CastleRights::BlackQueenside, CastleRights::BlackKingside]
     }
+
+    pub fn str_to_casle_rights(s: &str) -> u8{
+        let itr =  vec![
+                            ('K',CastleRights::WhiteKingside),
+                            ('Q',CastleRights::WhiteQueenside),
+                            ('k',CastleRights::BlackKingside),
+                            ('q',CastleRights::BlackQueenside)
+        ];
+        let mut rights = 0;
+        for (c, castle_right) in itr{
+            if s.contains(c){
+                rights |= 1<<(castle_right as u8);
+            }
+        }
+        rights
+    }
 }
 
 #[derive(Debug)]
@@ -35,10 +51,12 @@ pub struct PiceBoards{
 }
 
 impl PiceBoards {
+    #[allow(dead_code)]
     pub fn new(capture: u64, king: u64, diagonal_sliders: u64, orthoganal_sliders: u64, pawns: u64, horses: u64) -> PiceBoards{
         PiceBoards {capture, king, diagonal_sliders, orthoganal_sliders, pawns, knights: horses}
     }
 
+    #[allow(dead_code)]
     pub fn default(color: Color) -> PiceBoards{
         match color {
             Color::White => {
@@ -117,13 +135,8 @@ impl PiceBoards {
                 self.knights|=1<<to;
             },
             PiceType::Pawn => {
-                let pre = self.pawns.clone();
                 self.pawns^=1<<from;
                 self.pawns|=1<<to;
-                if self.pawns.count_ones() > 8{
-                    println!("{:?}, moves2 {}, {}, pre {}", self, from, to, pre);
-                    assert!(1==2);
-                }
             }
         }
     }
@@ -204,6 +217,7 @@ impl State {
         }
     }
 
+    #[allow(dead_code)]
     pub fn default() -> State{
         State { 
             white: PiceBoards::default(Color::White), 
@@ -216,12 +230,12 @@ impl State {
     pub fn from_pices(pices: &Vec<Pice>, passant: u64, casle_rights: u8) -> State{
         let white: Vec<&Pice> = pices.iter().filter(|pice| pice.color() == Color::White).collect();
         let black: Vec<&Pice> = pices.iter().filter(|pice| pice.color() == Color::Black).collect();
-        State { 
-            white: PiceBoards::from_pices(&white), 
-            black: PiceBoards::from_pices(&black), 
+        State::new(
+            PiceBoards::from_pices(&white), 
+            PiceBoards::from_pices(&black), 
             passant, 
             casle_rights
-        }
+        )
     }
 
     pub fn pice_at(&self, pos: u8) -> bool{
@@ -234,13 +248,6 @@ impl State {
 
     pub fn black_at(&self, pos: u8) -> bool{
         self.black.pice_at(pos)
-    }
-
-    pub fn color_at(&self, pos: u8, color: Color) -> bool{
-        match color {
-            Color::White => self.white_at(pos),
-            Color::Black => self.black_at(pos)
-        }
     }
 
     pub fn opposite_color_at(&self, pos: u8, color: Color) -> bool{
@@ -278,6 +285,7 @@ impl State {
                 self.black.capture = 0;
                 pices.iter().filter(|pice| pice.color() == color && !pice.is_captured()).for_each(|pice| {
                     self.black.capture |= pice.moves;
+                    println!("pice: {:?}",pice);
                 })
             }
         }

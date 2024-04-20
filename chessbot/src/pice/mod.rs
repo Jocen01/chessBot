@@ -1,4 +1,4 @@
-use crate::{constants, singlemove::{Move, MoveType}, state::{self, CastleRights, State}, Color, PiceType};
+use crate::{constants, singlemove::{Move, MoveType}, state::{CastleRights, State}, Color, PiceType};
 
 
 const CAPTURE_BIT: u8 = 5;
@@ -77,10 +77,22 @@ impl Pice {
                     panic!("not a valid castle move{:?}", mv);
                 }
             },
-            MoveType::PromotionQueen => self.promote_to(PiceType::Queen),
-            MoveType::PromotionRook => self.promote_to(PiceType::Rook),
-            MoveType::PromotionBishop => self.promote_to(PiceType::Bishop),
-            MoveType::PromotionKnight => self.promote_to(PiceType::Knight),
+            MoveType::PromotionQueen => {
+                self.pos = mv.to();
+                self.promote_to(PiceType::Queen);
+            },
+            MoveType::PromotionRook => {
+                self.pos = mv.to();
+                self.promote_to(PiceType::Rook);
+            },
+            MoveType::PromotionBishop => {
+                self.pos = mv.to();
+                self.promote_to(PiceType::Bishop);
+            },
+            MoveType::PromotionKnight => {
+                self.pos = mv.to();
+                self.promote_to(PiceType::Knight);
+            },
         }
     }
 
@@ -117,7 +129,7 @@ impl Pice {
             PiceType::Rook => self.update_moves_rook(&state),
             PiceType::Bishop => self.update_moves_bishop(&state),
             PiceType::Knight => self.update_moves_knight(&state),
-            PiceType::Pawn => self.update_moves_pawn(&state),
+            PiceType::Pawn => self.update_moves_pawn(),
         }
     }
 
@@ -234,7 +246,7 @@ impl Pice {
         moves
     }
 
-    fn update_moves_pawn(&mut self, state: &State ) {
+    fn update_moves_pawn(&mut self) {
         let mut moves = 0;
         if self.color() == Color::White{
             // if !state.pice_at(self.pos + 8){
@@ -509,81 +521,63 @@ mod tests {
         get_set_bits(&(i<<63));
     }
 
-    // #[test]
+    #[test]
     fn white_pawn_moves_default_board() {
-        let mut b: Board = Board::default();
-        b.update_moves(crate::Color::White);
-        b.update_moves(crate::Color::Black);
-        assert_eq!(b.get_pice_pos(8).unwrap().moves, vec_pos_to_bitmap(vec![16,24]));
-        assert_eq!(b.get_pice_pos(12).unwrap().moves, vec_pos_to_bitmap(vec![20,28]));
-        assert_eq!(b.get_pice_pos(15).unwrap().moves, vec_pos_to_bitmap(vec![23,31]));
+        let b: Board = Board::default();
+        assert_eq!(b.get_pice_pos(8).unwrap().moves, vec_pos_to_bitmap(vec![17]));
+        assert_eq!(b.get_pice_pos(12).unwrap().moves, vec_pos_to_bitmap(vec![19,21]));
+        assert_eq!(b.get_pice_pos(15).unwrap().moves, vec_pos_to_bitmap(vec![22]));
     }
 
-    // #[test]
+    #[test]
     fn black_pawn_moves_default_board() {
-        let mut b: Board = Board::default();
-        b.update_moves(crate::Color::White);
-        b.update_moves(crate::Color::Black);
-        assert_eq!(b.get_pice_pos(48).unwrap().moves, vec_pos_to_bitmap(vec![40,32]));
-        assert_eq!(b.get_pice_pos(52).unwrap().moves, vec_pos_to_bitmap(vec![44,36]));
-        assert_eq!(b.get_pice_pos(55).unwrap().moves, vec_pos_to_bitmap(vec![47,39]));
+        let b: Board = Board::default();
+        assert_eq!(b.get_pice_pos(48).unwrap().moves, vec_pos_to_bitmap(vec![41]));
+        assert_eq!(b.get_pice_pos(52).unwrap().moves, vec_pos_to_bitmap(vec![43,45]));
+        assert_eq!(b.get_pice_pos(55).unwrap().moves, vec_pos_to_bitmap(vec![46]));
     }
 
-    // #[test]
+    #[test]
     fn white_pawn_moves_first_move_double_block() {
-        let mut b: Board = Board::from_fen("rnbqkbnr/ppp1pppp/8/4P3/3p4/8/PPPP1PPP/RNBQKBNR w KQkq - 0 3");
-        b.update_moves(crate::Color::White);
-        b.update_moves(crate::Color::Black);
-        assert_eq!(b.get_pice_pos(11).unwrap().moves, vec_pos_to_bitmap(vec![19]));
+        let b: Board = Board::from_fen("rnbqkbnr/ppp1pppp/8/4P3/3p4/8/PPPP1PPP/RNBQKBNR w KQkq - 0 3");
+        assert_eq!(b.get_pice_pos(11).unwrap().moves, vec_pos_to_bitmap(vec![18,20]));
     }
 
-    // #[test]
+    #[test]
     fn black_pawn_moves_first_move_double_block() {
-        let mut b: Board = Board::from_fen("rnbqkbnr/ppp1pppp/8/4P3/3p4/3P4/PPP2PPP/RNBQKBNR b KQkq - 0 3");
-        b.update_moves(crate::Color::White);
-        b.update_moves(crate::Color::Black);
-        assert_eq!(b.get_pice_pos(52).unwrap().moves, vec_pos_to_bitmap(vec![44]));
+        let b: Board = Board::from_fen("rnbqkbnr/ppp1pppp/8/4P3/3p4/3P4/PPP2PPP/RNBQKBNR b KQkq - 0 3");
+        assert_eq!(b.get_pice_pos(52).unwrap().moves, vec_pos_to_bitmap(vec![43,45]));
     }
 
-    // #[test]
+    #[test]
     fn white_pawn_moves_capture() {
-        let mut b: Board = Board::from_fen("rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2");
-        b.update_moves(crate::Color::White);
-        b.update_moves(crate::Color::Black);
-        assert_eq!(b.get_pice_pos(28).unwrap().moves, vec_pos_to_bitmap(vec![35,36]));
+        let b: Board = Board::from_fen("rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2");
+        assert_eq!(b.get_pice_pos(28).unwrap().moves, vec_pos_to_bitmap(vec![35,37]));
     }
 
-    // #[test]
+    #[test]
     fn black_pawn_moves_capture() {
-        let mut b: Board = Board::from_fen("rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2");
-        b.update_moves(crate::Color::White);
-        b.update_moves(crate::Color::Black);
-        assert_eq!(b.get_pice_pos(35).unwrap().moves, vec_pos_to_bitmap(vec![28,27]));
+        let b: Board = Board::from_fen("rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2");
+        assert_eq!(b.get_pice_pos(35).unwrap().moves, vec_pos_to_bitmap(vec![26,28]));
     }
 
-    // #[test]
+    #[test]
     fn white_pawn_moves_capture_en_passant() {
-        let mut b: Board = Board::from_fen("rnbqkbnr/ppp1p1pp/8/3pPp2/8/8/PPPP1PPP/RNBQKBNR w KQkq f6 0 3");
-        b.update_moves(crate::Color::White);
-        b.update_moves(crate::Color::Black);
+        let b: Board = Board::from_fen("rnbqkbnr/ppp1p1pp/8/3pPp2/8/8/PPPP1PPP/RNBQKBNR w KQkq f6 0 3");
         assert_eq!(b.state.passant, 1<<45);
         assert!(b.state.passant_at(45));
-        assert_eq!(b.get_pice_pos(36).unwrap().moves, vec_pos_to_bitmap(vec![44,45]));
+        assert_eq!(b.get_pice_pos(36).unwrap().moves, vec_pos_to_bitmap(vec![43,45]));
     }
 
-    // #[test]
+    #[test]
     fn black_pawn_moves_capture_en_passant() {
-        let mut b: Board = Board::from_fen("rnbqkbnr/ppp1p1pp/8/3pP3/5pP1/5N2/PPPP1P1P/RNBQKB1R b KQkq g3 0 4");
-        b.update_moves(crate::Color::White);
-        b.update_moves(crate::Color::Black);
-        assert_eq!(b.get_pice_pos(29).unwrap().moves, vec_pos_to_bitmap(vec![22]));
+        let b: Board = Board::from_fen("rnbqkbnr/ppp1p1pp/8/3pP3/5pP1/5N2/PPPP1P1P/RNBQKB1R b KQkq g3 0 4");
+        assert_eq!(b.get_pice_pos(29).unwrap().moves, vec_pos_to_bitmap(vec![20,22]));
     }
 
     #[test]
     fn horse_moves_default_board() {
-        let mut b: Board = Board::default();
-        b.update_moves(crate::Color::White);
-        b.update_moves(crate::Color::Black);
+        let b: Board = Board::default();
         assert_eq!(b.get_pice_pos(1).unwrap().moves, vec_pos_to_bitmap(vec![16,18]));
         assert_eq!(b.get_pice_pos(6).unwrap().moves, vec_pos_to_bitmap(vec![21,23]));
         assert_eq!(b.get_pice_pos(57).unwrap().moves, vec_pos_to_bitmap(vec![40,42]));
@@ -592,18 +586,14 @@ mod tests {
 
     #[test]
     fn horse_moves_capture_pices() {
-        let mut b: Board = Board::from_fen("rnbqkb1r/pppppppp/2N5/8/8/2n5/PPPPPPPP/RNBQKB1R w KQkq - 6 4");
-        b.update_moves(crate::Color::White);
-        b.update_moves(crate::Color::Black);
+        let b: Board = Board::from_fen("rnbqkb1r/pppppppp/2N5/8/8/2n5/PPPPPPPP/RNBQKB1R w KQkq - 6 4");
         assert_eq!(b.get_pice_pos(42).unwrap().moves, vec_pos_to_bitmap(vec![59,52,36,27,25,32,48,57]));
         assert_eq!(b.get_pice_pos(18).unwrap().moves, vec_pos_to_bitmap(vec![1,3,12,28,33,35,8,24]));
     }
 
     #[test]
     fn rook_moves_default_board() {
-        let mut b: Board = Board::default();
-        b.update_moves(crate::Color::White);
-        b.update_moves(crate::Color::Black);
+        let b: Board = Board::default();
         assert_eq!(b.get_pice_pos(0).unwrap().moves, 0);
         assert_eq!(b.get_pice_pos(7).unwrap().moves, 0);
         assert_eq!(b.get_pice_pos(56).unwrap().moves, 0);
@@ -612,30 +602,22 @@ mod tests {
 
     #[test]
     fn rook_moves_full_length_1() {
-        let mut b: Board = Board::from_fen("rnbqkbn1/pppppp2/r7/8/8/7R/PPPPPPP1/RNBQKBN1 w Qq - 2 5");
-        b.update_moves(crate::Color::White);
-        b.update_moves(crate::Color::Black);
+        let b: Board = Board::from_fen("rnbqkbn1/pppppp2/r7/8/8/7R/PPPPPPP1/RNBQKBN1 w Qq - 2 5");
         assert_eq!(b.get_pice_pos(23).unwrap().moves, vec_pos_to_bitmap(vec![7,15,31,39,47,55,63,16,17,18,19,20,21,22]));
-        let mut b: Board = Board::from_fen("1nbqkbn1/1ppppp2/6r1/1R6/r7/7R/1PPPPPP1/1NBQKBN1 b - - 2 10");
-        b.update_moves(crate::Color::White);
-        b.update_moves(crate::Color::Black);
+        let b: Board = Board::from_fen("1nbqkbn1/1ppppp2/6r1/1R6/r7/7R/1PPPPPP1/1NBQKBN1 b - - 2 10");
         assert_eq!(b.get_pice_pos(24).unwrap().moves, vec_pos_to_bitmap(vec![0,8,16,32,40,48,56,25,26,27,28,29,30,31]));
     }
     
     #[test]
     fn rook_moves_capture() {
-        let mut b: Board = Board::from_fen("1nbqkbn1/1ppppp2/8/1R4r1/r7/7R/1PPPPPP1/1NBQKBN1 w - - 3 11");
-        b.update_moves(crate::Color::White);
-        b.update_moves(crate::Color::Black);
+        let b: Board = Board::from_fen("1nbqkbn1/1ppppp2/8/1R4r1/r7/7R/1PPPPPP1/1NBQKBN1 w - - 3 11");
         assert_eq!(b.get_pice_pos(33).unwrap().moves, vec_pos_to_bitmap(vec![32,34,35,36,37,38,17,25,41,49]));
         assert_eq!(b.get_pice_pos(38).unwrap().moves, vec_pos_to_bitmap(vec![14,22,30,46,54,33,34,35,36,37,39]));
     }
 
     #[test]
     fn bishop_moves_default_board() {
-        let mut b: Board = Board::default();
-        b.update_moves(crate::Color::White);
-        b.update_moves(crate::Color::Black);
+        let b: Board = Board::default();
         assert_eq!(b.get_pice_pos(2).unwrap().moves, 0);
         assert_eq!(b.get_pice_pos(5).unwrap().moves, 0);
         assert_eq!(b.get_pice_pos(58).unwrap().moves, 0);
@@ -644,49 +626,40 @@ mod tests {
 
     #[test]
     fn bishop_moves_full_length_1() {
-        let mut b: Board = Board::from_fen("1nbqk1n1/r1ppppbr/pp4p1/7p/7P/PP4P1/R1PPPPBR/1NBQK1N1 w - - 2 8");
-        b.update_moves(crate::Color::White);
-        b.update_moves(crate::Color::Black);
+        let b: Board = Board::from_fen("1nbqk1n1/r1ppppbr/pp4p1/7p/7P/PP4P1/R1PPPPBR/1NBQK1N1 w - - 2 8");
         assert_eq!(b.get_pice_pos(14).unwrap().moves, vec_pos_to_bitmap(vec![5,23,7,21,28,35,42,49,56]));
         assert_eq!(b.get_pice_pos(54).unwrap().moves, vec_pos_to_bitmap(vec![47,61,0,9,18,27,36,45,63]));
     }
     
     #[test]
     fn bishop_moves_capture() {
-        let mut b: Board = Board::from_fen("1n1qk1n1/rbpp1p1r/pp2p1p1/3B3p/3b3P/PP3NP1/1RPPPP1R/1NBQK3 w - - 0 11");
-        b.update_moves(crate::Color::White);
-        b.update_moves(crate::Color::Black);
+        let b: Board = Board::from_fen("1n1qk1n1/rbpp1p1r/pp2p1p1/3B3p/3b3P/PP3NP1/1RPPPP1R/1NBQK3 w - - 0 11");
         assert_eq!(b.get_pice_pos(35).unwrap().moves, vec_pos_to_bitmap(vec![49,42,44,26,28]));
         assert_eq!(b.get_pice_pos(27).unwrap().moves, vec_pos_to_bitmap(vec![9,18,20,13,34,36,45,54,63]));
     }
 
     #[test]
     fn king_moves_default_board() {
-        let mut b: Board = Board::default();
-        b.update_moves(crate::Color::White);
-        b.update_moves(crate::Color::Black);
+        let b: Board = Board::default();
         assert_eq!(b.get_pice_pos(4).unwrap().moves, 0);
         assert_eq!(b.get_pice_pos(60).unwrap().moves, 0);
     }
 
     // TODO by fixing the code for this test to pass would probobly speed up the move generation a LOT!
-    // #[test] 
-    // fn king_moves_move_into_check() {
-    //     let mut b: Board = Board::from_fen("rnbq1bnr/pppp1ppp/4p3/6k1/2K5/4P3/PPPP1PPP/RNBQ1BNR w - - 8 6");
-    //     b.update_moves(crate::Color::White);
-        // b.update_moves(crate::Color::Black);
-    //     assert_eq!(b.get_pice_pos(26).unwrap().moves, vec_pos_to_bitmap(vec![33,17,18,19,27]));
-    //     assert_eq!(b.get_pice_pos(38).unwrap().moves, vec_pos_to_bitmap(vec![45,46,47,37,31]));
-    // }
-
-    // #[test] 
-    fn king_moves_no_castle_default() {
-        let mut b: Board = Board::default();
-        b.update_moves(crate::Color::White);
+    #[test] 
+    fn king_moves_move_into_check() {
+        let mut b: Board = Board::from_fen("rnbq1bnr/pppp1ppp/4p3/6k1/2K5/4P3/PPPP1PPP/RNBQ1BNR w - - 8 6");
         b.update_moves(crate::Color::Black);
+        assert_eq!(b.get_pice_pos(26).unwrap().moves, vec_pos_to_bitmap(vec![33,17,18,19,27]));
+        assert_eq!(b.get_pice_pos(38).unwrap().moves, vec_pos_to_bitmap(vec![45,46,47,37,31]));
+    }
 
-        assert_eq!(b.get_pice_pos(19).unwrap().moves, vec_pos_to_bitmap(vec![26,27,28,18,12]));
-        assert_eq!(b.get_pice_pos(45).unwrap().moves, vec_pos_to_bitmap(vec![52,46,36,37,38]));
+    #[test] 
+    fn king_moves_no_castle_default() {
+        let b: Board = Board::default();
+
+        assert_eq!(b.get_pice_pos(4).unwrap().moves, vec_pos_to_bitmap(vec![]));
+        assert_eq!(b.get_pice_pos(60).unwrap().moves, vec_pos_to_bitmap(vec![]));
     }
 
     #[test] 

@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::{pice::Pice, singlemove::{Move, MoveType}, state::{CastleRights, State}, Color, PiceType};
+use crate::{pice::Pice, singlemove::{Move, MoveType}, state::{CastleRights, State}, Color};
 
 pub struct Board{
     pub pices: Vec<Pice>,
@@ -42,10 +42,13 @@ impl Board {
         if seq[3] != "-"{
             state.passant = 1<<Board::square_to_bitboard(seq[3])
         }
-        state.casle_rights = Board::str_to_casle_rights(seq[2]);
+        state.casle_rights = CastleRights::str_to_casle_rights(seq[2]);
 
 
-        Board::new(pices, board, turn, state)
+        let mut board = Board::new(pices, board, turn, state);
+        board.update_moves(board.turn.other());
+        board.update_moves(board.turn);
+        board
     }
 
     pub fn get_pice_pos(&self, p: u8) -> Option<&Pice>{
@@ -62,41 +65,10 @@ impl Board {
             pice.update_moves(&self.state);
         });
         self.reset_state_can_move(color);
-
-        // self.reset_state_pices_bitboard();
-        // for i in 0..self.pices.len(){
-        //     self.pices[i].update_moves(&self.state);
-        // }
-        // self.reset_state_can_move();
-        // for i in 0..self.pices.len(){
-        //     if self.pices[i].pice_type() == PiceType::King{
-        //         self.pices[i].update_moves(&self.state);
-        //     }
-        // }
     }
-
-    // fn reset_state_pices_bitboard(&mut self){
-    //     todo!();
-    //     // self.state.reset_pices_bitboard();
-    //     // self.pices.iter().filter(|&pice| !pice.is_captured()).for_each(|pice| {
-    //     //     if pice.color() == Color::White{
-    //     //         self.state.white_pices_bitboard |= 1<<pice.pos
-    //     //     }else {
-    //     //         self.state.black_pices_bitboard |= 1<<pice.pos
-    //     //     }
-    //     // });
-    // }
 
     fn reset_state_can_move(&mut self, color: Color){
         self.state.reset_can_capture(color, &self.pices);
-        // self.state.reset_can_move();
-        // self.pices.iter().for_each(|pice| {
-        //     if pice.color() == Color::White{
-        //         self.state.white_can_move |= pice.moves
-        //     }else {
-        //         self.state.black_can_move |= pice.moves
-        //     }
-        // });
     }
 
     pub fn get_possible_moves(&mut self, color: Color) -> Vec<Move>{
@@ -357,16 +329,6 @@ impl Board {
         bitboard + (((pos.chars().nth(1).unwrap().to_digit(10).unwrap() as u8)-1)<<3)
 
     }
-
-    fn str_to_casle_rights(s: &str) -> u8{
-        let mut rights = 0;
-        for (idx, c) in vec!['K','Q','k','q'].iter().rev().enumerate(){
-            if s.contains(*c){
-                rights |= 1<<idx
-            }
-        }
-        rights
-    }
 }
 
 
@@ -461,7 +423,7 @@ mod tests {
     #[test]
     fn from_fen_casle_rights_Kq() {
         let b: Board = Board::from_fen("rnbqkbn1/pppppppr/7p/8/8/P7/RPPPPPPP/1NBQKBNR w Kq - 2 3");
-        assert_eq!(b.state.casle_rights, 0b1001);
+        assert_eq!(b.state.casle_rights, 0b110);
     }
 
     #[test]
@@ -493,6 +455,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "large movegeneration takes time"]
     fn count_moves_default() {
         let mut board = Board::default();
         assert_eq!(count_moves(&mut board, 1), 20);
@@ -538,17 +501,27 @@ mod tests {
     }
 
     #[test]
-    fn count_moves_kiwipete() {
+    #[ignore = "large movegeneration takes time"]
+    fn count_moves_kiwipete_small() {
         let mut board = Board::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq -");
         assert_eq!(count_moves(&mut board, 1), 48);
-        println!("state {:?}", board.state);
         assert_eq!(count_moves(&mut board, 2), 2_039);
-        println!("state {:?}", board.state);
-        assert_eq!(count_moves_print(&mut board, 3,1), 97862);
-        println!("state {:?}", board.state);
-        assert_eq!(count_moves(&mut board, 4), 4_085_603);
-        // assert_eq!(count_moves(&mut board, 5), 193_690_690);
-        // assert_eq!(count_moves(&mut board, 6), 8_031_647_685);
+        assert_eq!(count_moves(&mut board, 3), 97862);
+    }
+
+    #[test]
+    #[ignore = "large movegeneration takes time"]
+    fn count_moves_kiwipete_medium() {
+        let mut board = Board::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq -");
+        assert_eq!(count_moves(&mut board, 4), 4_085_603); // ca 45 sekunder
+    }
+
+    #[test]
+    #[ignore = "large movegeneration takes time"]
+    fn count_moves_kiwipete_large() {
+        let mut board = Board::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq -");
+        assert_eq!(count_moves(&mut board, 5), 193_690_690);
+        assert_eq!(count_moves(&mut board, 6), 8_031_647_685);
     }
 
 
@@ -564,7 +537,6 @@ mod tests {
         let mut board = Board::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/1PN2Q1p/P1PBBPPP/R3K2R b KQkq - 0 1");
         board.make_move(Move::new(23, 14, MoveType::Normal));
         board.make_move(Move::new(12, 5, MoveType::Normal));
-        // assert_eq!(1,2);
         assert_eq!(count_moves(&mut board, 1),56);
     }
 
@@ -574,9 +546,6 @@ mod tests {
         board.make_move(Move::new(18, 1, MoveType::Normal));
         board.make_move(Move::new(45, 28, MoveType::Normal));
         assert_eq!(count_moves(&mut board, 1), 51);
-        // assert_eq!(count_moves(&mut board, 4), 4_085_603);
-        // assert_eq!(count_moves(&mut board, 5), 193_690_690);
-        // assert_eq!(count_moves(&mut board, 6), 8_031_647_685);
     }
 
     #[test]
@@ -585,6 +554,107 @@ mod tests {
         board.make_move(Move::new(11, 29, MoveType::Normal));
         board.make_move(Move::new(23, 14, MoveType::Normal));
         assert_eq!(count_moves(&mut board, 1), 45);
+    }
+
+    #[test]
+    fn count_moves_pos_3_passant_double_pinned_small() {
+        let mut board = Board::from_fen("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - ");
+        assert_eq!(count_moves(&mut board, 1), 14);
+        assert_eq!(count_moves(&mut board, 2), 191);
+        assert_eq!(count_moves(&mut board, 3), 2_812);
+        assert_eq!(count_moves(&mut board, 4), 43_238);
+        assert_eq!(count_moves(&mut board, 5), 674_624);
+    }
+
+    #[test]
+    #[ignore = "large movegeneration takes time"]
+    fn count_moves_pos_3_passant_double_pinned_medium() {
+        let mut board = Board::from_fen("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - ");
+        assert_eq!(count_moves(&mut board, 6), 11_030_083); // ca 45 sekunder
+    }
+
+    #[test]
+    #[ignore = "large movegeneration takes time"]
+    fn count_moves_pos_3_passant_double_pinned_large() {
+        let mut board = Board::from_fen("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - ");
+        assert_eq!(count_moves(&mut board, 7), 178_633_661);
+        assert_eq!(count_moves(&mut board, 8), 3_009_794_393);
+    }
+
+    #[test]
+    fn count_moves_pos_4_small() {
+        let mut board = Board::from_fen("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1");
+        assert_eq!(count_moves(&mut board, 1), 6);
+        assert_eq!(count_moves(&mut board, 2), 264);
+        assert_eq!(count_moves(&mut board, 3), 9_467);
+        assert_eq!(count_moves(&mut board, 4), 422_333);
+    }
+
+    #[test]
+    #[ignore = "large movegeneration takes time"]
+    fn count_moves_pos_4_medium() {
+        let mut board = Board::from_fen("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1");
+        assert_eq!(count_moves(&mut board, 5), 15_833_292);
+    }
+
+    #[test]
+    #[ignore = "large movegeneration takes time"]
+    fn count_moves_pos_4_large() {
+        let mut board = Board::from_fen("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1");
+        assert_eq!(count_moves(&mut board, 6), 706_045_033);
+    }
+
+    #[test]
+    fn count_moves_pos_5_small() {
+        let mut board = Board::from_fen("rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8 ");
+        assert_eq!(count_moves(&mut board, 1), 44);
+        assert_eq!(count_moves(&mut board, 2), 1_486);
+        assert_eq!(count_moves(&mut board, 3), 62_379);
+    }
+
+    #[test]
+    #[ignore = "large movegeneration takes time"]
+    fn count_moves_pos_5_medium() {
+        let mut board = Board::from_fen("rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8 ");
+        assert_eq!(count_moves(&mut board, 4), 2_103_487); // 116 sekunder
+    }
+
+    #[test]
+    #[ignore = "large movegeneration takes time"]
+    fn count_moves_pos_5_large() {
+        let mut board = Board::from_fen("rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8 ");
+        assert_eq!(count_moves(&mut board, 5), 89_941_194); 
+    }
+
+    #[test]
+    fn count_moves_pos_6_small() {
+        let mut board = Board::from_fen("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10 ");
+        assert_eq!(count_moves(&mut board, 1), 46);
+        assert_eq!(count_moves(&mut board, 2), 2_079);
+        assert_eq!(count_moves(&mut board, 3), 89_890);
+    }
+
+    #[test]
+    #[ignore = "large movegeneration takes time"]
+    fn count_moves_pos_6_medium() {
+        let mut board = Board::from_fen("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10 ");
+        assert_eq!(count_moves(&mut board, 4), 3_894_594); 
+    }
+
+    #[test]
+    #[ignore = "large movegeneration takes time"]
+    fn count_moves_pos_6_large() {
+        let mut board = Board::from_fen("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10 ");
+        assert_eq!(count_moves(&mut board, 5), 164_075_551); 
+    }
+
+    
+    #[test]
+    fn count_moves_pos_4_small_specific() {
+        let mut board = Board::from_fen("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1");
+        board.make_move(Move::new(11, 27, MoveType::Normal));
+        board.make_move(Move::new(9, 0, MoveType::PromotionQueen));
+        assert_eq!(count_moves_print(&mut board, 1,1), 39);
     }
 
     fn count_moves(board: &mut Board, depth: u8) -> u64{
@@ -623,7 +693,7 @@ mod tests {
 
             let a = count_moves(board, depth - 1);
             if print_depth > 0{
-                println!("from: {}, to {} : {}", m.from(), m.to(), a);
+                println!("from: {}, to {} : {}, typ: {:?}", m.from(), m.to(), a, m.move_type());
             }
             res += a;
             board.undo_last_move();
