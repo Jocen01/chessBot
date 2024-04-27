@@ -27,8 +27,50 @@ pub struct Move{
 }
 
 impl Move {
-        pub fn new(from: u8, to: u8, move_type: MoveType) -> Move {
+    pub fn new(from: u8, to: u8, move_type: MoveType) -> Move {
         Move {value: (to as u32)  | (from as u32) << 6 | (move_type as u32) << 16, captured: None}
+    }
+
+    pub fn from_str(s: &str) -> Move{
+        panic!("todo");
+    }
+
+    pub fn long_algebraic_notation(&self) -> String{
+        let pos: Vec<String> = vec![self.from(), self.to()].iter().map(|pos| {
+            Move::square_to_coordinates(*pos)
+        }).collect();
+        let mut res = pos.concat();
+        match self.move_type() {
+            MoveType::PromotionQueen => {
+                res.push('q')
+            },
+            MoveType::PromotionRook => {
+                res.push('r')
+            },
+            MoveType::PromotionBishop => {
+                res.push('b')
+            },
+            MoveType::PromotionKnight => {
+                res.push('n')
+            },
+            _ => {
+
+            }
+        }
+        res
+    }
+
+    fn square_to_coordinates(square: u8) -> String {
+        if square < 64 {
+            let rank = (square / 8) + b'1';
+            let file = (square % 8) + b'a';
+            let mut result = String::new();
+            result.push(file as char);
+            result.push(rank as char);
+            result
+        } else {
+            panic!("not a valid square");
+        }
     }
 
     pub fn capture(&mut self, pice: usize){

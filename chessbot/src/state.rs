@@ -180,13 +180,7 @@ impl PiceBoards {
                 self.knights|=1<<pos;
             },
             PiceType::Pawn => {
-                if self.pawns.count_ones() > 8{
-                    println!("{:?}, prepawns1 ", self);
-                }
                 self.pawns|=1<<pos;
-                if self.pawns.count_ones() > 8{
-                    println!("{:?}, prepawns ", self);
-                }
             }
         }
     }
@@ -285,7 +279,6 @@ impl State {
                 self.black.capture = 0;
                 pices.iter().filter(|pice| pice.color() == color && !pice.is_captured()).for_each(|pice| {
                     self.black.capture |= pice.moves;
-                    println!("pice: {:?}",pice);
                 })
             }
         }

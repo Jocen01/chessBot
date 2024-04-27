@@ -1,10 +1,11 @@
-use crate::board::Board;
+use crate::{board::Board, uci_engine::{UciEngine, UciMessage}};
 
 mod pice;
 mod board;
 mod singlemove;
 mod constants;
 mod state;
+mod uci_engine;
 
 
 #[derive(Debug,PartialEq, Clone, Copy)]
@@ -98,19 +99,48 @@ fn vec_pos_to_bitmap(pos: Vec<u8>) -> u64{
     res
 }
 
-fn main() {
-    let b = Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
-    println!("{}", b);
-    let mut b = Board::default();
+#[allow(unused_macros)]
+macro_rules! read_str {
+    ($out:ident) => {
+        #[allow(unused_mut)]
+        let mut inner = String::new();
+        std::io::stdin().read_line(&mut inner).expect("A String");
+        let $out = inner.trim();
+    };
+}
 
-    let colors = vec![Color::White, Color::Black];
-    for i in 0..20{
-        let moves = b.get_possible_moves(colors[i%2]);
-        println!("{:?}, color: {:?}",moves, colors[i%2]);
-        b.make_move(moves[5]);
-        println!("{}", b);
+fn main() {
+    // let b = Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+    // println!("{}", b);
+    // let mut b = Board::default();
+    // let uci_engine = UciEngine::new();
+
+    // let colors = vec![Color::White, Color::Black];
+    // for i in 0..20{
+    //     let moves = b.get_possible_moves(colors[i%2]);
+    //     println!("{:?}, color: {:?}",moves, colors[i%2]);
+    //     b.make_move(moves[5]);
+    //     println!("{}", b);
+    // }
+    // b.undo_last_move();
+
+    let mut engine = UciEngine::new();
+    loop {
+        read_str!(msg_str);
+        let msg = UciMessage::parse(msg_str.into());
+        match msg {
+            UciMessage::Quit => {
+                break;
+            },
+            _ => {
+                if let Some(pub_msg_vec) = engine.execute(msg) {
+                    for pub_msg in pub_msg_vec{
+                        println!("{}", pub_msg.serialize());
+                    }
+                }
+            }
+        }         
     }
-    b.undo_last_move();
 }
 
 

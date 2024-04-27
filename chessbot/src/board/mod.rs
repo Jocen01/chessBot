@@ -90,6 +90,10 @@ impl Board {
         moves
     }
 
+    pub fn get_possible_moves_turn(&mut self) -> Vec<Move>{
+        self.get_possible_moves(self.turn)
+    }
+
     pub fn make_move(&mut self, mut mv: Move) {
         let to = mv.to();
         let from = mv.from();
