@@ -1,8 +1,9 @@
 use rand::prelude::*;
 
-use crate::{board::{self, Board}, singlemove::{Move, MoveType}};
+use crate::{board::Board, singlemove::{Move, MoveType}};
 
 #[derive(Clone)]
+#[allow(dead_code)]
 pub enum UciMessage {
     Uci,
     Debug(bool),
@@ -88,42 +89,60 @@ impl UciMessage {
         } else if s == "ucinewgame" {
             UciMessage::UciNewGame
         } else if s.starts_with("position") {
-            let moves_pos = s.find("moves").unwrap();
+            let mut moves_res = vec![];
+            let moves_pos = s.find("moves").unwrap_or(s.len());
+            
             let fen: Option<String> = if s.contains("startpos") { None } else {
                 Some(s[8..moves_pos].trim().into())
             };
-            let mut board = if let Some(fenn) = fen.clone() {
-                Board::from_fen(&fenn)
-            }else{
-                Board::default()
-            };
-            let mut moves_res = vec![];
-            s[moves_pos + 5..].split_whitespace().into_iter().for_each(|move_str| {
-                let moves = board.get_possible_moves_turn();
-                let (from_square, to_square) = parse_algebraic_notation(move_str);
-                moves.iter().filter(|&mv| {
-                    mv.from() == from_square && mv.to() == to_square
-                }).filter(|&mv|{
-                    if move_str.len() == 5{
-                        match move_str.chars().nth(4).unwrap() {
-                            'q' => mv.move_type() == MoveType::PromotionQueen,
-                            'r' => mv.move_type() == MoveType::PromotionRook,
-                            'b' => mv.move_type() == MoveType::PromotionBishop,
-                            'k' => mv.move_type() == MoveType::PromotionKnight,
-                            _ => true
-                        }
-                    }else {
-                        true
-                    }
-                }).for_each(|mv| {
-                    moves_res.push(*mv);
-                    board.make_move(*mv);
 
+            if s.contains("moves") {
+            
+                let mut board = if let Some(fenn) = fen.clone() {
+                    Board::from_fen(&fenn)
+                }else{
+                    Board::default()
+                };
+                s[moves_pos + 5..].split_whitespace().into_iter().for_each(|move_str| {
+                    let moves = board.get_possible_moves_turn();
+                    let (from_square, to_square) = parse_algebraic_notation(move_str);
+                    moves.iter().filter(|&mv| {
+                        mv.from() == from_square && mv.to() == to_square
+                    }).filter(|&mv|{
+                        if move_str.len() == 5{
+                            match move_str.chars().nth(4).unwrap() {
+                                'q' => mv.move_type() == MoveType::PromotionQueen,
+                                'r' => mv.move_type() == MoveType::PromotionRook,
+                                'b' => mv.move_type() == MoveType::PromotionBishop,
+                                'k' => mv.move_type() == MoveType::PromotionKnight,
+                                _ => true
+                            }
+                        }else {
+                            true
+                        }
+                    }).for_each(|mv| {
+                        moves_res.push(*mv);
+                        board.make_move(*mv);
+
+                    });
                 });
-            });
+            }
+            
             UciMessage::Position { fen: fen, moves: moves_res }
         }else if s.starts_with("go") {
-            UciMessage::Go { search_moves: None, ponder: false, wtime: 10000, btime: 10000, winc: 10000, binc: 10000, depth: 4, nodes: 10000000, mate: 100, move_time: 1000, infinite: false }
+            UciMessage::Go { 
+                search_moves: None, 
+                ponder: false, 
+                wtime: 10000, 
+                btime: 10000, 
+                winc: 10000, 
+                binc: 10000, 
+                depth: 4, 
+                nodes: 10000000, 
+                mate: 100, 
+                move_time: 1000, 
+                infinite: false 
+            }
         } else if s == "stop" {
             UciMessage::Stop
         } else if s == "ponderhit" {
@@ -137,7 +156,17 @@ impl UciMessage {
 
     pub fn serialize(&self) -> String{
         match self {
-            UciMessage::Uci | UciMessage::Debug(..) | UciMessage::IsReady | UciMessage::Register { .. } | UciMessage::UciNewGame | UciMessage::Position { .. } |UciMessage::Go { .. } | UciMessage::Stop | UciMessage::Ponderhit | UciMessage::Quit | UciMessage::SetOption { .. }=> {
+            UciMessage::Uci 
+            | UciMessage::Debug(..) 
+            | UciMessage::IsReady 
+            | UciMessage::Register { .. } 
+            | UciMessage::UciNewGame 
+            | UciMessage::Position { .. } 
+            | UciMessage::Go { .. } 
+            | UciMessage::Stop 
+            | UciMessage::Ponderhit 
+            | UciMessage::Quit 
+            | UciMessage::SetOption { .. } => {
                 panic!("not serializable");
             },
             UciMessage::Id { name, author } => {
@@ -225,10 +254,10 @@ impl UciEngine {
             UciMessage::IsReady => {
                 Some(vec![UciMessage::ReadyOk])
             },
-            UciMessage::SetOption { name, value } => {
+            UciMessage::SetOption { .. } => {
                 panic!("options not implemented")
             },
-            UciMessage::Register { later, name, code } => {
+            UciMessage::Register { .. } => {
                 todo!()
             },
             UciMessage::UciNewGame => {
