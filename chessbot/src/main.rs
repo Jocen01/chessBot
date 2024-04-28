@@ -1,4 +1,4 @@
-use crate::{board::Board, uci_engine::{UciEngine, UciMessage}};
+use crate::{uci_engine::UciEngine, uci_message::UciMessage};
 
 mod pice;
 mod board;
@@ -6,6 +6,7 @@ mod singlemove;
 mod constants;
 mod state;
 mod uci_engine;
+mod uci_message;
 
 
 #[derive(Debug,PartialEq, Clone, Copy)]
@@ -99,7 +100,6 @@ fn vec_pos_to_bitmap(pos: Vec<u8>) -> u64{
     res
 }
 
-#[allow(unused_macros)]
 macro_rules! read_str {
     ($out:ident) => {
         #[allow(unused_mut)]

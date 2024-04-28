@@ -31,10 +31,6 @@ impl Move {
         Move {value: (to as u32)  | (from as u32) << 6 | (move_type as u32) << 16, captured: None}
     }
 
-    pub fn from_str(s: &str) -> Move{
-        panic!("todo");
-    }
-
     pub fn long_algebraic_notation(&self) -> String{
         let pos: Vec<String> = vec![self.from(), self.to()].iter().map(|pos| {
             Move::square_to_coordinates(*pos)

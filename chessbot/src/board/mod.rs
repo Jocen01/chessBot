@@ -1,18 +1,20 @@
 use std::fmt;
 
-use crate::{pice::Pice, singlemove::{Move, MoveType}, state::{CastleRights, State}, Color};
+use crate::{pice::Pice, singlemove::{Move, MoveType}, state::{CastleRights, State, Zobrist}, Color};
 
 pub struct Board{
     pub pices: Vec<Pice>,
     board: [Option<usize>;64],
     turn: Color,
-    moves: Vec<Move>,
+    pub moves: Vec<Move>,
     pub state: State,
+    zobrist: Zobrist
 }
 
 impl Board {
     fn new(pices: Vec<Pice>, board: [Option<usize>;64], turn: Color, state: State) -> Board{
-        Board { pices, board, turn, moves: vec![], state}
+        let zobrist = Zobrist::from_pices(&pices, &state);
+        Board { pices, board, turn, moves: vec![], state, zobrist }
     }
 
     pub fn default() -> Board{
@@ -42,13 +44,17 @@ impl Board {
         if seq[3] != "-"{
             state.passant = 1<<Board::square_to_bitboard(seq[3])
         }
-        state.casle_rights = CastleRights::str_to_casle_rights(seq[2]);
+        state.castle_rights = CastleRights::str_to_casle_rights(seq[2]);
 
 
-        let mut board = Board::new(pices, board, turn, state);
-        board.update_moves(board.turn.other());
-        board.update_moves(board.turn);
-        board
+        let mut res = Board::new(pices, board, turn, state);
+        res.update_moves(res.turn.other());
+        res.update_moves(res.turn);
+        res
+    }
+
+    pub fn to_fen(&self) -> String{ 
+        todo!("");
     }
 
     pub fn get_pice_pos(&self, p: u8) -> Option<&Pice>{
@@ -285,6 +291,8 @@ impl Board {
         
         self.turn = self.turn.other();
         self.update_moves(self.turn); // was needed before but is now only in make move
+        
+
 
     }
 
@@ -333,6 +341,11 @@ impl Board {
         bitboard + (((pos.chars().nth(1).unwrap().to_digit(10).unwrap() as u8)-1)<<3)
 
     }
+
+    pub fn get_zobrist_hash(&mut self) -> u64{
+        self.zobrist = Zobrist::from_pices(&self.pices, &self.state);
+        self.zobrist.get()
+    }
 }
 
 
@@ -363,6 +376,8 @@ impl fmt::Display for Board {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use crate::{board::Board, pice::Pice, singlemove::{Move, MoveType}, Color, PiceType};
 
     #[test]
@@ -413,21 +428,21 @@ mod tests {
     #[test]
     fn from_fen_casle_rights_KQkq() {
         let b: Board = Board::from_fen("rnbqkbnr/ppp1p1pp/8/3pP3/5pP1/5N2/PPPP1P1P/RNBQKB1R b KQkq g3 0 4");
-        assert_eq!(b.state.casle_rights, 0b1111);
+        assert_eq!(b.state.castle_rights, 0b1111);
     }
 
     #[allow(non_snake_case)]
     #[test]
     fn from_fen_casle_rights_Kk() {
         let b: Board = Board::from_fen("1nbqkbnr/rpp1pppp/p7/4P3/3p4/P2P4/RPP2PPP/1NBQKBNR b Kk - 2 5");
-        assert_eq!(b.state.casle_rights, 0b1010);
+        assert_eq!(b.state.castle_rights, 0b1010);
     }
 
     #[allow(non_snake_case)]
     #[test]
     fn from_fen_casle_rights_Kq() {
         let b: Board = Board::from_fen("rnbqkbn1/pppppppr/7p/8/8/P7/RPPPPPPP/1NBQKBNR w Kq - 2 3");
-        assert_eq!(b.state.casle_rights, 0b110);
+        assert_eq!(b.state.castle_rights, 0b110);
     }
 
     #[test]
@@ -460,13 +475,13 @@ mod tests {
 
     #[test]
     #[ignore = "large movegeneration takes time"]
-    fn count_moves_default() {
+    fn count_moves_default_1() {
         let mut board = Board::default();
         assert_eq!(count_moves(&mut board, 1), 20);
         assert_eq!(count_moves(&mut board, 2), 400);
         assert_eq!(count_moves(&mut board, 3), 8_902);
         assert_eq!(count_moves(&mut board, 4), 197_281);
-        // assert_eq!(count_moves(&mut board, 5), 4_865_609);
+        assert_eq!(count_moves(&mut board, 5), 4_865_609);
         // assert_eq!(count_moves(&mut board, 6), 119_060_324);
         // assert_eq!(count_moves(&mut board, 7), 3_195_901_860);
         // assert_eq!(count_moves(&mut board, 8), 84_998_978_956);
@@ -661,6 +676,34 @@ mod tests {
         assert_eq!(count_moves_print(&mut board, 1,1), 39);
     }
 
+    #[test]
+    #[ignore = "large movegeneration takes time"]
+    fn count_moves_kiwipete_medium_hash_speedup() {
+        let mut board = Board::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq -");
+        let mut hashtable: HashMap<u64, u64> = HashMap::new();
+        assert_eq!(count_moves_hash(&mut board, &mut hashtable, 4), 4_085_603); // ca 45 sekunder utan hash 25 med
+    }
+
+    #[test]
+    #[ignore = "large movegeneration takes time"]
+    fn count_moves_default_hash_speedup() {
+        let mut board = Board::default();
+        let mut hashtable: HashMap<u64, u64> = HashMap::new();
+        
+        assert_eq!(count_moves_hash(&mut board, &mut hashtable, 1), 20);
+        assert_eq!(count_moves_hash(&mut board, &mut hashtable, 2), 400);
+        assert_eq!(count_moves_hash(&mut board, &mut hashtable, 3), 8_902);
+        hashtable = HashMap::new();
+        assert_eq!(count_moves_hash(&mut board, &mut hashtable, 4), 197_281);
+        hashtable = HashMap::new();
+        assert_eq!(count_moves_hash(&mut board, &mut hashtable, 5), 4_865_609);
+        // hashtable = HashMap::new();
+        // assert_eq!(count_moves_hash(&mut board, &mut hashtable, 6), 119_060_324);
+
+        // assert_eq!(count_moves(&mut board, 7), 3_195_901_860);
+        // assert_eq!(count_moves(&mut board, 8), 84_998_978_956);
+    }
+
     fn count_moves(board: &mut Board, depth: u8) -> u64{
         if depth == 0{ 
             // println!("{}", board);
@@ -702,6 +745,31 @@ mod tests {
             res += a;
             board.undo_last_move();
         }
+        res
+    }
+
+    fn count_moves_hash(board: &mut Board, hashtable: &mut HashMap<u64, u64>, depth: u8) -> u64{
+        if depth == 0{ 
+            // println!("{}", board);
+            // assert_eq!(board.pices.iter().filter(|p| p.color() == Color::White).count(),board.pices.iter().filter(|p| p.color() == Color::Black).count());
+
+            return 1;
+        }
+        if let Some(nbr_moves) = hashtable.get(&(board.get_zobrist_hash() ^ (depth as u64))) {
+            return *nbr_moves;
+        }
+        let moves = board.get_possible_moves(board.turn);
+
+        // let nbr_castle = moves.iter().filter(|mv| mv.move_type() == MoveType::Castle).count();
+        // println!("nbr castle {}", nbr_castle);
+
+        let mut res = 0;
+        for m in moves{
+            board.make_move(m);
+            res += count_moves_hash(board, hashtable ,depth - 1);
+            board.undo_last_move();
+        }
+        hashtable.insert(board.get_zobrist_hash() ^ (depth as u64), res);
         res
     }
 
