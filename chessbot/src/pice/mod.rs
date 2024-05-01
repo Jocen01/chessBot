@@ -148,7 +148,9 @@ impl Pice {
         let moves = constants::KINGS_BIT_MOVES[self.pos as usize];
         let own = state.piceboards(self.color());
         let enemy = state.piceboards(self.color().other());
-        self.moves = moves & (!enemy.capture) & (!own.bitmap_all());
+        let enemy_king_pos = enemy.king.trailing_zeros() as usize;
+        let enemy_king_moves = constants::KINGS_BIT_MOVES[enemy_king_pos];
+        self.moves = moves & (!enemy.capture) & (!own.bitmap_all()) & (!enemy_king_moves);
         
         // if Color::from_int(self.typ) == Color::White{
         //     self.moves = moves ^ (moves & state.white_pices_bitboard);
@@ -677,6 +679,7 @@ mod tests {
         pice.promote_to(PiceType::Queen);
         assert_eq!(pice.color(), Color::White);
     }
+
 
 }
 
