@@ -346,6 +346,10 @@ impl Board {
         self.zobrist = Zobrist::from_pices(&self.pices, &self.state);
         self.zobrist.get()
     }
+
+    pub fn is_white(&self) -> bool{
+        self.turn == Color::White
+    }
 }
 
 

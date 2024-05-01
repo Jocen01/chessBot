@@ -1,6 +1,4 @@
-use rand::prelude::*;
-
-use crate::{board::Board, singlemove::Move, uci_message::UciMessage};
+use crate::{board::Board, searcher, singlemove::Move, uci_message::UciMessage};
 
 
 pub struct UciEngine {
@@ -88,15 +86,17 @@ impl UciEngine {
     }
 
     fn best_move(&mut self) -> Move{
-        let mut moves = self.board.get_possible_moves_turn();
-        let mut rng = rand::thread_rng();
+        // let mut moves = self.board.get_possible_moves_turn();
+        // let mut rng = rand::thread_rng();
 
-        moves.shuffle(&mut rng);
-        if let Some(mv) = moves.first() {
-            *mv
-        }else {
-            panic!("no leagal moves")
-        }
+        // moves.shuffle(&mut rng);
+        // if let Some(mv) = moves.first() {
+        //     *mv
+        // }else {
+        //     panic!("no leagal moves")
+        // }
+        let (mv, _score) = searcher::search(&mut self.board, 5);
+        mv
     }
 }
 

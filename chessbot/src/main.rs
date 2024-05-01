@@ -7,6 +7,9 @@ mod constants;
 mod state;
 mod uci_engine;
 mod uci_message;
+mod evaluate;
+mod searcher;
+mod transposition_table;
 
 
 #[derive(Debug,PartialEq, Clone, Copy)]
