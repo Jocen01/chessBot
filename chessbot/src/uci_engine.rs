@@ -1,17 +1,23 @@
-use crate::{board::Board, searcher, singlemove::Move, uci_message::UciMessage};
+use crate::{board::Board, searcher::Searcher, singlemove::Move, uci_message::UciMessage};
 
 
 pub struct UciEngine {
     board: Board,
+    searcher: Searcher,
     #[allow(dead_code)]
     settings: String,
-    debug: bool
+    debug: bool,
 }
 
 impl UciEngine {
     
     pub fn new() -> UciEngine{
-        UciEngine { board: Board::default(), settings: "".into(), debug: false }
+        UciEngine { 
+            board: Board::default(),
+            searcher: Searcher::new(100000), 
+            settings: "".into(), 
+            debug: false,
+        }
     }
 
     pub fn execute(&mut self, message: UciMessage) -> Option<Vec<UciMessage>>{
@@ -95,7 +101,11 @@ impl UciEngine {
         // }else {
         //     panic!("no leagal moves")
         // }
-        let (mv, _score) = searcher::search(&mut self.board, 5);
+        let (mv, _score) = self.searcher.search(&mut self.board, 4);
+
+        // let (mv, _score) = self.searcher.search_2(&mut self.board, 4);
+        // let (mv, _score) = self.searcher.search_3(&mut self.board, 4);
+        // let (mv, _score) = searcher::search(&mut self.board, 4);
         mv
     }
 }
@@ -135,6 +145,25 @@ mod test{
         engine.execute(msg);
         let algebraic_moves: Vec<String> = engine.board.get_possible_moves_turn().iter().map(|mv| mv.long_algebraic_notation()).collect();
         assert!(!algebraic_moves.contains(&"h8e8".into()));
+    }
 
+    #[test]
+    fn scholars_mate_in_one(){
+        let mut engine = UciEngine::new();
+        SETUP_COMMANDS.iter().for_each(|msg | {
+            engine.execute(msg.clone());
+        });
+        let msg = UciMessage::parse("position startpos moves e2e3 b8a6 f1c4 a6b8 d1f3 b8a6".into());
+        engine.execute(msg);
+        if let Some(vec_msg) = engine.execute(UciMessage::parse("go".into())){
+            assert_eq!(vec_msg.len(), 1);
+            let msg = vec_msg.first().unwrap();
+            match msg {
+                UciMessage::BestMove { best_move, ponder: _ } => {
+                    assert_eq!(best_move.to(), 53)
+                },
+                _ => panic!("go doesnt return best move command")
+            }
+        }
     }
 }

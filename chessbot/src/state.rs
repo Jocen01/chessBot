@@ -191,13 +191,21 @@ impl PiceBoards {
 pub struct Zobrist(u64);
 
 impl Zobrist {
-    pub fn from_pices(pices: &Vec<Pice>, state: &State) -> Zobrist{
+    pub fn from_pices(pices: &Vec<Pice>, state: &State, turn: Color) -> Zobrist{
         let mut zob = 0;
         zob ^= state.passant;
         zob ^= constants::ZOBRIST_CASTLE_RIGHTS[state.castle_rights as usize];
         pices.iter().filter(|pice| !pice.is_captured()).for_each(|pice| {
             zob ^= Zobrist::rand_value(&pice);
         });
+        match turn {
+            Color::White => {
+                zob ^= constants::ZOBRIST_TURN_COLOR[0];
+            },
+            Color::Black => {
+                zob ^= constants::ZOBRIST_TURN_COLOR[1];
+            }
+        }
 
         Zobrist(zob)
     }

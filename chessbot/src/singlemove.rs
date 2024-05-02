@@ -35,6 +35,7 @@ impl Move {
         Move { value: 0, captured: None }
     }
 
+    #[allow(dead_code)]
     pub fn is_null_move(&self) -> bool{
         self.value == 0
     }

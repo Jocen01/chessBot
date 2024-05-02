@@ -13,7 +13,7 @@ pub struct Board{
 
 impl Board {
     fn new(pices: Vec<Pice>, board: [Option<usize>;64], turn: Color, state: State) -> Board{
-        let zobrist = Zobrist::from_pices(&pices, &state);
+        let zobrist = Zobrist::from_pices(&pices, &state, turn);
         Board { pices, board, turn, moves: vec![], state, zobrist }
     }
 
@@ -51,10 +51,6 @@ impl Board {
         res.update_moves(res.turn.other());
         res.update_moves(res.turn);
         res
-    }
-
-    pub fn to_fen(&self) -> String{ 
-        todo!("");
     }
 
     pub fn get_pice_pos(&self, p: u8) -> Option<&Pice>{
@@ -343,7 +339,7 @@ impl Board {
     }
 
     pub fn get_zobrist_hash(&mut self) -> u64{
-        self.zobrist = Zobrist::from_pices(&self.pices, &self.state);
+        self.zobrist = Zobrist::from_pices(&self.pices, &self.state, self.turn);
         self.zobrist.get()
     }
 
@@ -706,6 +702,23 @@ mod tests {
 
         // assert_eq!(count_moves(&mut board, 7), 3_195_901_860);
         // assert_eq!(count_moves(&mut board, 8), 84_998_978_956);
+    }
+
+
+    #[test]
+    fn king_close_to_king(){
+        let mut board = Board::from_fen("8/2k1p3/p3K2n/P1p2p1p/3b1P1P/r7/8/8 b - - 11 48".into());
+        let moves = board.get_possible_moves_turn();
+        assert_eq!(moves.len(), 30);
+    }
+
+    #[test]
+    fn one_valid_move(){
+        let mut board = Board::from_fen("7r/2p2N2/2p2bp1/p3k3/P5Kp/8/8/8 b - - 4 59".into());
+        let moves = board.get_possible_moves_turn();
+        assert_eq!(moves.len(), 4);
+        println!("moves: {:?}",moves);
+        assert!(1==2);
     }
 
     fn count_moves(board: &mut Board, depth: u8) -> u64{
