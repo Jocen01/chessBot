@@ -92,6 +92,13 @@ impl Color {
             Color::Black => Color::White,
         }
     }
+
+    pub fn to_0_1(&self) -> usize{
+        match self {
+            Color::White => 0,
+            Color::Black => 1
+        }
+    }
 }
 
 #[allow(dead_code)]
@@ -145,6 +152,7 @@ fn main() {
         }         
     }
 }
+
 
 
 

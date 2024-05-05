@@ -133,14 +133,14 @@ impl Pice {
         }
     }
 
-    pub fn get_moves(&mut self, state: &State ) -> Vec<Move>{
+    pub fn get_moves(&mut self, state: &State, captures_only: bool) -> Vec<Move>{
         match PiceType::_type(self.typ) {
-            PiceType::King => self.gen_king_moves(&state),
-            PiceType::Queen => self.gen_queen_moves(),
-            PiceType::Rook => self.gen_rook_moves(),
-            PiceType::Bishop => self.gen_bishop_moves(),
-            PiceType::Knight => self.gen_knight_moves(),
-            PiceType::Pawn => self.gen_pawn_moves(&state),
+            PiceType::King => self.gen_king_moves(&state, captures_only),
+            PiceType::Queen => self.gen_queen_moves(&state, captures_only),
+            PiceType::Rook => self.gen_rook_moves(&state, captures_only),
+            PiceType::Bishop => self.gen_bishop_moves(&state, captures_only),
+            PiceType::Knight => self.gen_knight_moves(&state, captures_only),
+            PiceType::Pawn => self.gen_pawn_moves(&state, captures_only),
         }
     }
 
@@ -165,11 +165,18 @@ impl Pice {
         // todo!("yet to implement casle")
     }
 
-    fn gen_king_moves(&self, state: &State) -> Vec<Move>{
+    fn gen_king_moves(&self, state: &State, captures_only: bool) -> Vec<Move>{
         // normal moves
-        let mut moves : Vec<Move> = get_set_bits(&self.moves).iter().map(|i| {
+        let move_mask = if !captures_only{
+            self.moves
+        } else { self.moves & state.piceboards(self.color().other()).bitmap_all()};
+        let mut moves : Vec<Move> = get_set_bits(&move_mask).iter().map(|i| {
             Move::new(self.pos, *i, MoveType::Normal)
         }).collect();
+
+        // return early if captures_only
+        // castle is not considerd capture :)
+        if captures_only { return moves; };
 
         let own = state.piceboards(self.color());
         let enemy = state.piceboards(self.color().other());
@@ -209,22 +216,31 @@ impl Pice {
         self.moves = self.diagonal_moves(state);
     }
 
-    fn gen_queen_moves(&self) -> Vec<Move>{
-        let moves : Vec<Move> = get_set_bits(&self.moves).iter().map(|i| {
+    fn gen_queen_moves(&self, state: &State, captures_only: bool) -> Vec<Move>{
+        let move_mask = if !captures_only{
+            self.moves
+        } else { self.moves & state.piceboards(self.color().other()).bitmap_all()};
+        let moves : Vec<Move> = get_set_bits(&move_mask).iter().map(|i| {
             Move::new(self.pos, *i, MoveType::Normal)
         }).collect();
         moves
     }
 
-    fn gen_bishop_moves(&self) -> Vec<Move>{
-        let moves : Vec<Move> = get_set_bits(&self.moves).iter().map(|i| {
+    fn gen_bishop_moves(&self, state: &State, captures_only: bool) -> Vec<Move>{
+        let move_mask = if !captures_only{
+            self.moves
+        } else { self.moves & state.piceboards(self.color().other()).bitmap_all()};
+        let moves : Vec<Move> = get_set_bits(&move_mask).iter().map(|i| {
             Move::new(self.pos, *i, MoveType::Normal)
         }).collect();
         moves
     }
 
-    fn gen_rook_moves(&self) -> Vec<Move>{
-        let moves : Vec<Move> = get_set_bits(&self.moves).iter().map(|i| {
+    fn gen_rook_moves(&self, state: &State, captures_only: bool) -> Vec<Move>{
+        let move_mask = if !captures_only{
+            self.moves
+        } else { self.moves & state.piceboards(self.color().other()).bitmap_all()};
+        let moves : Vec<Move> = get_set_bits(&move_mask).iter().map(|i| {
             Move::new(self.pos, *i, MoveType::Normal)
         }).collect();
         moves
@@ -240,9 +256,12 @@ impl Pice {
         // }
     }
 
-    fn gen_knight_moves(&self) -> Vec<Move>{
+    fn gen_knight_moves(&self, state: &State, captures_only: bool) -> Vec<Move>{
         // todo pinned
-        let moves = get_set_bits(&self.moves).iter().map(|i| {
+        let move_mask = if !captures_only{
+            self.moves
+        } else { self.moves & state.piceboards(self.color().other()).bitmap_all()};
+        let moves : Vec<Move> = get_set_bits(&move_mask).iter().map(|i| {
             Move::new(self.pos, *i, MoveType::Normal)
         }).collect();
         moves
@@ -288,8 +307,8 @@ impl Pice {
         self.moves = moves;
     }
 
-    fn gen_pawn_moves(&self, state: &State) -> Vec<Move>{
-
+    fn gen_pawn_moves(&self, state: &State, captures_only: bool) -> Vec<Move>{
+        // helper function to add move and promotion if nessesary
         fn add_move(moves: &mut Vec<Move>, from: u8, to: u8 ) {
             if to < 8 || to >= 56{
                 MoveType::iter_promotions().iter().for_each(|move_type| {
@@ -303,7 +322,8 @@ impl Pice {
         let mut moves: Vec<Move> = vec![];
 
         if self.color() == Color::White{
-            if !state.pice_at(self.pos + 8){
+            // forward moves
+            if !state.pice_at(self.pos + 8) && !captures_only{
                 add_move(&mut moves, self.pos, self.pos + 8);
 
                 //first move double push
@@ -311,7 +331,7 @@ impl Pice {
                     moves.push(Move::new(self.pos, self.pos + 16, MoveType::Pawndubblemove));
                 }
             }
-           
+            // captures lower file
             if self.pos & 0b111 != 0{
                 if state.black_at(self.pos + 7)  {
                     add_move(&mut moves, self.pos, self.pos + 7);
@@ -322,6 +342,7 @@ impl Pice {
                 }
 
             }
+            // captures higher file
             if self.pos & 0b111 != 7{
                 if state.black_at(self.pos + 9) {
                     add_move(&mut moves, self.pos, self.pos + 9);
@@ -332,7 +353,8 @@ impl Pice {
                 }
             }
         } else {
-            if !state.pice_at(self.pos - 8){
+            // forward moves
+            if !state.pice_at(self.pos - 8) && !captures_only{
                 add_move(&mut moves, self.pos, self.pos - 8);
                 // moves.push(Move::new(self.pos, self.pos - 8, MoveType::Normal));
 
@@ -341,6 +363,7 @@ impl Pice {
                     moves.push(Move::new(self.pos, self.pos - 16, MoveType::Pawndubblemove));
                 }
             }
+            // captures lower file
             if self.pos & 0b111 != 0{
                 if state.white_at(self.pos - 9)  {
                     add_move(&mut moves, self.pos, self.pos - 9);
@@ -351,6 +374,7 @@ impl Pice {
                 }
 
             }
+            // captures higher file
             if self.pos & 0b111 != 7{
                 if state.white_at(self.pos - 7) {
                     add_move(&mut moves, self.pos, self.pos - 7);
@@ -515,7 +539,7 @@ fn get_set_bits(pos: &u64) -> Vec<u8>{
 
 #[cfg(test)]
 mod tests {
-    use crate::{board::Board, pice::Pice, vec_pos_to_bitmap, Color, PiceType, pice::get_set_bits};
+    use crate::{board::Board, pice::{get_set_bits, Pice}, singlemove::{Move, MoveType}, vec_pos_to_bitmap, Color, PiceType};
 
     #[test]
     fn get_set_bits_63(){
@@ -680,6 +704,24 @@ mod tests {
         assert_eq!(pice.color(), Color::White);
     }
 
+    #[test]
+    fn casle_while_in_check(){
+        let mut board = Board::from_fen("3rk2r/p3ppbp/1p6/1Q6/8/2q5/P1P2PPP/1RB2RK1 b k - 1".into());
+        let moves: Vec<Move> = board.get_possible_moves_turn();
+        let movetypes: Vec<MoveType> = moves.iter().map(|mv| mv.move_type()).collect();
+        let castle = movetypes.contains(&MoveType::Castle);
+        // r1b1k2r/pppp1ppp/5n2/3Pq3/2B5/2b1B3/PPP2PPP/R2QK2R w KQkq - 0 10
+        // r1b1k2r/ppppqppp/8/3P4/3B2n1/2P2Q2/P1P2PPP/R3KB1R w KQkq - 1 11
+        assert!(!castle);
+        board.make_move(moves.first().unwrap().clone());
+        board.undo_last_move();
+        let moves: Vec<Move> = board.get_possible_moves_turn();
+        let movetypes: Vec<MoveType> = moves.iter().map(|mv| mv.move_type()).collect();
+        let castle = movetypes.contains(&MoveType::Castle);
+        // r1b1k2r/pppp1ppp/5n2/3Pq3/2B5/2b1B3/PPP2PPP/R2QK2R w KQkq - 0 10
+        // r1b1k2r/ppppqppp/8/3P4/3B2n1/2P2Q2/P1P2PPP/R3KB1R w KQkq - 1 11
+        assert!(!castle);
+    }
 
 }
 

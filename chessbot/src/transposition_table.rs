@@ -31,7 +31,7 @@ pub struct TranspositionsTable{
     hash_table: Vec<Option<Entry>>,
     size: usize,
 }
-
+// https://web.archive.org/web/20071031100051/http://www.brucemo.com/compchess/programming/hashing.htm
 impl TranspositionsTable {
     pub fn new(size: usize) -> TranspositionsTable{
         TranspositionsTable{

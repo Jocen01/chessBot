@@ -1,5 +1,6 @@
 use crate::{board::Board, evaluate, singlemove::Move, transposition_table::{TranspositionsFlag, TranspositionsTable}};
 use rand::prelude::*;
+use std::time::{Duration, Instant};
 
 // cant use i32::MIN cause if negetet it overflows
 const NEGATIVE_INF: i32 = i32::MIN + 1;
@@ -7,7 +8,9 @@ const POSETIVE_INF: i32 = i32::MAX - 1;
 
 pub struct Searcher{
     traspos_table: TranspositionsTable,
-    pub searches: u64
+    pub searches: u64,
+    start_time: Instant,
+    duration: Duration
 }
 
 impl Searcher {
@@ -15,15 +18,13 @@ impl Searcher {
         Searcher{
             traspos_table: TranspositionsTable::new(traspos_table_size),
             searches: 0,
+            start_time: Instant::now(),
+            duration: Duration::from_millis(200)
         }
     }
 
     pub fn search(&mut self, board: &mut Board, depth: usize) -> (Move, i32){
-        // dont know if table needs clearing
-        self.traspos_table.clear();
-        self.searches = 0;
-
-        let val = self.search_alpha_beta(board, NEGATIVE_INF, POSETIVE_INF, depth);
+        let val = self.search_alpha_beta(board, NEGATIVE_INF, POSETIVE_INF, depth, 0);
         // let mv = self.traspos_table.get_best_move(board.get_zobrist_hash());
         // if let Some(mv) = mv {
         
@@ -38,9 +39,30 @@ impl Searcher {
         val
     }
 
-    // fn iterative_deepening(&mut self, board: &mut Board) -> 
+    pub fn iterative_deepening(&mut self, board: &mut Board) -> (Move, i32){
+        // dont know if table needs clearing
+        self.traspos_table.clear();
+        self.searches = 0;
 
-    fn search_alpha_beta(&mut self, board: &mut Board, mut alpha: i32, beta: i32, depth: usize) -> (Move, i32){
+        self.start_time = Instant::now();
+        let mut best_move = Move::null_move();
+        let mut val = 0;
+        for depth in 1..255{
+            let (mv, val_depth) = self.search(board, depth);
+            
+            // return if searchtime has elapsed
+            if self.start_time.elapsed() >= self.duration {
+                break;
+            }else {
+                best_move = mv;
+                val = val_depth;
+            }
+        }
+
+        (best_move, val)
+    }
+
+    fn search_alpha_beta(&mut self, board: &mut Board, mut alpha: i32, beta: i32, depth: usize, ply: usize) -> (Move, i32){
         let mut flag = TranspositionsFlag::UpperBound;
         let zobrist = board.get_zobrist_hash();
         self.searches += 1;
@@ -53,10 +75,9 @@ impl Searcher {
         }
         if depth == 0{
             
-            let mut val = evaluate::evaluate(board);
-            if !board.is_white(){
-                val *= -1;
-            }
+            // let mut val = evaluate::evaluate_turn(board);
+
+            let val = self.search_stable_pos(board, alpha, beta);
             self.traspos_table.record_entry(zobrist, depth, val, TranspositionsFlag::Exact, None);
             return (Move::null_move(),val);
         }
@@ -74,7 +95,7 @@ impl Searcher {
 
         for mv in moves{
             board.make_move(mv);
-            let (_mov,mut val) = self.search_alpha_beta(board, -beta, -alpha, depth - 1);
+            let (_,mut val) = self.search_alpha_beta(board, -beta, -alpha, depth - 1, ply + 1);
             val = -val;
             board.undo_last_move();
 
@@ -90,10 +111,52 @@ impl Searcher {
                 alpha = val;
                 best_move = mv;
             }
+            // return if searchtime has elapsed
+            if self.start_time.elapsed() >= self.duration {
+                return (best_move, alpha);
+            }
         }       
         //  record the position and the best move found
         self.traspos_table.record_entry(zobrist, depth, alpha, flag, Some(best_move));
         (best_move, alpha)
+    }
+
+    fn search_stable_pos(&mut self, board: &mut Board, mut alpha: i32, beta: i32) ->  i32{
+        self.searches += 1;
+            
+        let mut val = evaluate::evaluate_turn(board);
+
+        if val >= beta{
+            return beta;
+        }
+        // alpha = val;
+        alpha = alpha.max(val);
+        //get captures only
+        let mut moves = board.get_possible_captures_turn();
+
+        //random ordering for moves before ordering is implemented
+        let mut rng = rand::thread_rng();
+        moves.shuffle(&mut rng);
+
+        for mv in moves{
+            board.make_move(mv);
+            val = -self.search_stable_pos(board, -beta, -alpha);
+            board.undo_last_move();
+
+            //branch can be pruned
+            if val >= beta{
+                return beta;
+            }
+
+            // found a new best move
+            alpha = alpha.max(val);
+
+            // return if searchtime has elapsed
+            if self.start_time.elapsed() >= self.duration {
+                break;
+            }
+        }       
+        alpha
     }
 
     #[allow(dead_code)]
@@ -107,7 +170,7 @@ impl Searcher {
         self.searches += 1;
         if depth == 0{
             if let Some(mv) = board.moves.last() {
-                (*mv, evaluate::evaluate(board))
+                (*mv, evaluate::evaluate_white(board))
                 
             }else {
                 panic!("cant search start pos at depth 0")

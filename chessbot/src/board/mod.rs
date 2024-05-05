@@ -8,7 +8,7 @@ pub struct Board{
     turn: Color,
     pub moves: Vec<Move>,
     pub state: State,
-    zobrist: Zobrist
+    pub zobrist: Zobrist
 }
 
 impl Board {
@@ -77,7 +77,7 @@ impl Board {
         let mut moves: Vec<Move> = vec![];
         self.update_moves(color);
         self.pices.iter_mut().filter(|p| p.color() == color && !p.is_captured()).for_each(|pice| {
-            let mut add = pice.get_moves(&self.state);
+            let mut add = pice.get_moves(&self.state, false);
             moves.append(&mut add);
         });
         moves.retain(|mv| {
@@ -94,6 +94,29 @@ impl Board {
 
     pub fn get_possible_moves_turn(&mut self) -> Vec<Move>{
         self.get_possible_moves(self.turn)
+    }
+
+    pub fn get_possible_captures(&mut self, color: Color) -> Vec<Move>{
+        let mut moves: Vec<Move> = vec![];
+        self.update_moves(color);
+        self.pices.iter_mut().filter(|p| p.color() == color && !p.is_captured()).for_each(|pice| {
+            let mut add = pice.get_moves(&self.state, true);
+            moves.append(&mut add);
+        });
+        moves.retain(|mv| {
+            self.make_move(*mv);
+
+            self.update_moves(self.turn);
+
+            let res = self.state.in_check(self.turn.other());
+            self.undo_last_move();
+            !res
+        });
+        moves
+    }
+
+    pub fn get_possible_captures_turn(&mut self) -> Vec<Move>{
+        self.get_possible_captures(self.turn)
     }
 
     pub fn make_move(&mut self, mut mv: Move) {
@@ -284,7 +307,7 @@ impl Board {
             }
         }
         
-        
+        self.update_moves(self.turn); // was needed before but is now only in make move
         self.turn = self.turn.other();
         self.update_moves(self.turn); // was needed before but is now only in make move
         
@@ -345,6 +368,10 @@ impl Board {
 
     pub fn is_white(&self) -> bool{
         self.turn == Color::White
+    }
+
+    pub fn get_turn(&self) -> Color{
+        self.turn
     }
 }
 
@@ -717,8 +744,6 @@ mod tests {
         let mut board = Board::from_fen("7r/2p2N2/2p2bp1/p3k3/P5Kp/8/8/8 b - - 4 59".into());
         let moves = board.get_possible_moves_turn();
         assert_eq!(moves.len(), 4);
-        println!("moves: {:?}",moves);
-        assert!(1==2);
     }
 
     fn count_moves(board: &mut Board, depth: u8) -> u64{
