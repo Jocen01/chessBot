@@ -24,19 +24,7 @@ impl Searcher {
     }
 
     pub fn search(&mut self, board: &mut Board, depth: usize) -> (Move, i32){
-        let val = self.search_alpha_beta(board, NEGATIVE_INF, POSETIVE_INF, depth, 0);
-        // let mv = self.traspos_table.get_best_move(board.get_zobrist_hash());
-        // if let Some(mv) = mv {
-        
-        //     (mv, val)
-        // }else {
-        //     if let Some(mv) = board.get_possible_moves_turn().first() {
-        //         (*mv, val)
-        //     }else {
-        //         panic!("no leagal moves, board \n{}", board);
-        //     }
-        // }
-        val
+        self.search_alpha_beta(board, NEGATIVE_INF, POSETIVE_INF, depth, 0)
     }
 
     pub fn iterative_deepening(&mut self, board: &mut Board) -> (Move, i32){
@@ -81,17 +69,48 @@ impl Searcher {
             self.traspos_table.record_entry(zobrist, depth, val, TranspositionsFlag::Exact, None);
             return (Move::null_move(),val);
         }
+        // init bet move
+        let mut best_move = Move::null_move();        
+
+        // start with the previous best move in the position
+        if let Some(mv) = self.traspos_table.get_best_move(zobrist) {
+            assert!(!mv.is_null_move());
+            board.make_move(mv);
+            let (_,mut val) = self.search_alpha_beta(board, -beta, -alpha, depth - 1, ply + 1);
+            val = -val;
+            board.undo_last_move();
+
+            //branch can be pruned
+            if val >= beta{
+                self.traspos_table.record_entry(zobrist, depth, val, TranspositionsFlag::LowerBound, Some(mv));
+                return (mv, beta);
+            }
+
+            // found a new best move
+            if val > alpha{
+                flag = TranspositionsFlag::Exact;
+                alpha = val;
+                best_move = mv;
+            }
+            // return if searchtime has elapsed
+            if self.start_time.elapsed() >= self.duration {
+                return (best_move, alpha);
+            }
+        }
+
+
         let mut moves = board.get_possible_moves_turn();
 
         //random ordering for moves before ordering is implemented
         let mut rng = rand::thread_rng();
         moves.shuffle(&mut rng);
 
-        // a first best move
-        let mut best_move = if let Some(mv) = moves.first() {
-            *mv
-        }else{ Move::null_move() };
-       
+        // set a random best move to avoid nullmove being returned
+        if best_move.is_null_move(){
+            if let Some(mv) = moves.first() {
+                best_move = *mv;
+            }
+        }
 
         for mv in moves{
             board.make_move(mv);

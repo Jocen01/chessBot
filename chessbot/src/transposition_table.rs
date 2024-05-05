@@ -62,16 +62,22 @@ impl TranspositionsTable {
         None
     }
 
-    pub fn record_entry(&mut self, zobrist: u64, depth: usize, value: i32, flag: TranspositionsFlag, best_move: Option<Move>){
+    pub fn record_entry(&mut self, zobrist: u64, depth: usize, value: i32, flag: TranspositionsFlag, mut best_move: Option<Move>){
+        if let Some(mv) = best_move{
+            if mv.is_null_move(){
+                best_move = None;
+            }
+        }
         let entry = Entry::new(zobrist, depth, flag, value, best_move);
         self.hash_table[(zobrist as usize) % self.size] = Some(entry);
     }
 
     pub fn get_best_move(&self, zobrist: u64) -> Option<Move>{
         if let Some(entry) = &self.hash_table[(zobrist as usize) % self.size]{
-            entry.best
-        }else {
-            None
+            if entry.zobrist == zobrist{
+                return entry.best;
+            }
         }
+        None
     }
 }

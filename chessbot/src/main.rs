@@ -120,20 +120,6 @@ macro_rules! read_str {
 }
 
 fn main() {
-    // let b = Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
-    // println!("{}", b);
-    // let mut b = Board::default();
-    // let uci_engine = UciEngine::new();
-
-    // let colors = vec![Color::White, Color::Black];
-    // for i in 0..20{
-    //     let moves = b.get_possible_moves(colors[i%2]);
-    //     println!("{:?}, color: {:?}",moves, colors[i%2]);
-    //     b.make_move(moves[5]);
-    //     println!("{}", b);
-    // }
-    // b.undo_last_move();
-
     let mut engine = UciEngine::new();
     loop {
         read_str!(msg_str);
