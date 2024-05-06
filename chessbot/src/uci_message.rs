@@ -92,7 +92,7 @@ impl UciMessage {
             let moves_pos = s.find("moves").unwrap_or(s.len());
             
             let fen: Option<String> = if s.contains("startpos") { None } else {
-                Some(s[8..moves_pos].trim().into())
+                Some(s[12..moves_pos].trim().into())
             };
 
             if s.contains("moves") {
@@ -139,7 +139,7 @@ impl UciMessage {
                 depth: 4, 
                 nodes: 10000000, 
                 mate: 100, 
-                move_time: 1000, 
+                move_time: 200, 
                 infinite: false 
             }
         } else if s == "stop" {

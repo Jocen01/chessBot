@@ -38,7 +38,8 @@ impl UciEngine {
                 Some(vec![UciMessage::ReadyOk])
             },
             UciMessage::SetOption { .. } => {
-                panic!("options not implemented")
+                //panic!("options not implemented")
+                Some(vec![])
             },
             UciMessage::Register { .. } => {
                 todo!()

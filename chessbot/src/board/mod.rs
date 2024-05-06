@@ -8,7 +8,7 @@ pub struct Board{
     turn: Color,
     pub moves: Vec<Move>,
     pub state: State,
-    pub zobrist: Zobrist
+    zobrist: Zobrist
 }
 
 impl Board {

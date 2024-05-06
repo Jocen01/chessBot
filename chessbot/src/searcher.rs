@@ -19,7 +19,7 @@ impl Searcher {
             traspos_table: TranspositionsTable::new(traspos_table_size),
             searches: 0,
             start_time: Instant::now(),
-            duration: Duration::from_millis(200)
+            duration: Duration::from_millis(500)
         }
     }
 
@@ -54,6 +54,7 @@ impl Searcher {
         let mut flag = TranspositionsFlag::UpperBound;
         let zobrist = board.get_zobrist_hash();
         self.searches += 1;
+
         // lookup the position if it exists in the table
         if let Some(val) = self.traspos_table.lookup_eval(zobrist, depth, alpha, beta){
             if let Some(best) = self.traspos_table.get_best_move(zobrist) {
@@ -61,14 +62,14 @@ impl Searcher {
             }
             return (Move::null_move(),val);
         }
+        
+        // full depth is reached return nullmove and evaluation
         if depth == 0{
-            
-            // let mut val = evaluate::evaluate_turn(board);
-
             let val = self.search_stable_pos(board, alpha, beta);
             self.traspos_table.record_entry(zobrist, depth, val, TranspositionsFlag::Exact, None);
             return (Move::null_move(),val);
         }
+
         // init bet move
         let mut best_move = Move::null_move();        
 
@@ -112,6 +113,15 @@ impl Searcher {
             }
         }
 
+        // return 0 if stalemate else -Inf checkmate
+        if moves.is_empty(){
+            if board.state.in_check(board.get_turn()){
+                return (Move::null_move(), NEGATIVE_INF);
+            }else {
+                return (Move::null_move(),0);
+            }
+        }
+
         for mv in moves{
             board.make_move(mv);
             let (_,mut val) = self.search_alpha_beta(board, -beta, -alpha, depth - 1, ply + 1);
@@ -130,6 +140,7 @@ impl Searcher {
                 alpha = val;
                 best_move = mv;
             }
+            
             // return if searchtime has elapsed
             if self.start_time.elapsed() >= self.duration {
                 return (best_move, alpha);
@@ -189,7 +200,7 @@ impl Searcher {
         self.searches += 1;
         if depth == 0{
             if let Some(mv) = board.moves.last() {
-                (*mv, evaluate::evaluate_white(board))
+                (*mv, evaluate::evaluate_white_old(board))
                 
             }else {
                 panic!("cant search start pos at depth 0")
