@@ -92,7 +92,8 @@ impl UciMessage {
             let moves_pos = s.find("moves").unwrap_or(s.len());
             
             let fen: Option<String> = if s.contains("startpos") { None } else {
-                Some(s[12..moves_pos].trim().into())
+                let f = if s.contains("fen"){ 12 } else { 8 };
+                Some(s[f..moves_pos].trim().into())
             };
 
             if s.contains("moves") {
@@ -122,6 +123,7 @@ impl UciMessage {
                     }).for_each(|mv| {
                         moves_res.push(*mv);
                         board.make_move(*mv);
+                        board.add_state_to_history();
 
                     });
                 });

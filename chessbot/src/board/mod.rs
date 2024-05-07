@@ -1,4 +1,5 @@
 use std::fmt;
+use std::collections::HashSet;
 
 use crate::{pice::Pice, singlemove::{Move, MoveType}, state::{CastleRights, State, Zobrist}, Color};
 
@@ -8,13 +9,14 @@ pub struct Board{
     turn: Color,
     pub moves: Vec<Move>,
     pub state: State,
-    zobrist: Zobrist
+    zobrist: Zobrist,
+    game_history: HashSet<u64>
 }
 
 impl Board {
     fn new(pices: Vec<Pice>, board: [Option<usize>;64], turn: Color, state: State) -> Board{
         let zobrist = Zobrist::from_pices(&pices, &state, turn);
-        Board { pices, board, turn, moves: vec![], state, zobrist }
+        Board { pices, board, turn, moves: vec![], state, zobrist, game_history: HashSet::new() }
     }
 
     pub fn default() -> Board{
@@ -372,6 +374,15 @@ impl Board {
 
     pub fn get_turn(&self) -> Color{
         self.turn
+    }
+
+    pub fn add_state_to_history(&mut self){
+        let zob = self.get_zobrist_hash();
+        self.game_history.insert(zob);
+    }
+
+    pub fn game_history_contains(&self, zobrist: u64) -> bool{
+        self.game_history.contains(&zobrist)
     }
 }
 

@@ -1,5 +1,9 @@
 use crate::{board::Board, constants, state::{PiceBoards, State}, Color};
 
+// cant use i32::MIN cause if negetet it overflows
+pub const NEGATIVE_INF: i32 = i32::MIN + 10000;
+pub const POSETIVE_INF: i32 = i32::MAX - 10000;
+
 #[allow(dead_code)]
 pub fn evaluate_white_old(board: &Board) -> i32{
     let white = sum_pice_values(&board.state.white);
@@ -28,13 +32,16 @@ fn sum_pice_values(pice_board: &PiceBoards) -> i32{
     value
 }
 
-pub fn evaluate_white(board: &Board) -> i32{
+fn evaluate_white(board: &Board) -> i32{
     let mut eval = evaluate_pice_pos(board);
     eval += eval_past_pawns(&board.state);
+    eval += mobility_score(&board.state);
+    eval += rooks_on_open_files(&board.state);
+    eval += doubled_pawns(&board.state);
     eval
 }
 
-pub fn evaluate_pice_pos(board: &Board) -> i32{
+fn evaluate_pice_pos(board: &Board) -> i32{
     let mut mg: [i32;2] = [0,0];
     let mut eg: [i32;2] = [0,0];
     let mut game_phase = 0;
@@ -96,9 +103,84 @@ fn eval_past_pawns(state: &State) -> i32{
 }
 
 fn mobility_score(state: &State) -> i32{
-    0
+    ((state.white.capture.count_ones() as i32) - (state.black.capture.count_ones() as i32)) * 5
 }
 
 fn rooks_on_open_files(state: &State) -> i32{
-    0
+    fn help(own: &PiceBoards, opponent: &PiceBoards) -> i32{
+        let rooks = get_set_bits(&(own.orthoganal_sliders & (own.orthoganal_sliders ^ own.diagonal_sliders)));
+        rooks.iter().map(|pos| {
+            let mask = constants::FILES_MASK[*pos as usize & 0b111];
+            if mask & own.pawns == 0{
+                if mask & opponent.pawns == 0{
+                    20
+                }else {
+                    8
+                }
+            }else {
+                0
+            }
+        }).sum()
+    }
+    help(&state.white, &state.black) - help(&state.black, &state.white)
+}
+
+fn doubled_pawns(state: &State) -> i32{
+    let mut eval = 0;
+    for mask in constants::FILES_MASK{
+        if (state.white.pawns & mask).count_ones() > 1{
+            eval -= 50;
+        }
+        if (state.black.pawns & mask).count_ones() > 1{
+            eval += 50;
+        }
+    }
+    eval
+}
+
+#[allow(dead_code)]
+fn bishops_on_open_diagonals(state: &State) -> i32{
+    fn help(own: &PiceBoards, opponent: &PiceBoards) -> i32{
+        let bishops = get_set_bits(&(own.diagonal_sliders & (own.orthoganal_sliders ^ own.diagonal_sliders)));
+        bishops.iter().map(|pos| {
+            let mask = constants::FILES_MASK[*pos as usize & 0b111];
+            if mask & own.pawns == 0{
+                if mask & opponent.pawns == 0{
+                    20
+                }else {
+                    8
+                }
+            }else {
+                0
+            }
+        }).sum()
+    }
+    help(&state.white, &state.black) - help(&state.black, &state.white)
+}
+
+pub fn draw_by_repetition() -> i32{
+    -50
+}
+
+pub fn mate_ajusted_score(ply: usize) -> i32{
+    NEGATIVE_INF + 10 + (ply as i32)
+}
+
+pub fn is_mate_score(score: i32) -> bool{
+    score.abs() > 100000
+}
+
+
+#[cfg(test)]
+mod tests {
+    use crate::{board::Board, evaluate::evaluate_white};
+
+    #[test]
+    fn same_eval_both_sides(){
+        let fen1 = "r1bqk2r/2p1bppp/p1np1n2/1p2p3/4P3/1B3N2/PPPP1PPP/RNBQR1K1 w kq - 0 8";
+        let fen2 = "rnbqr1k1/pppp1ppp/1b3n2/4p3/1P2P3/P1NP1N2/2P1BPPP/R1BQK2R b kq - 0 8";
+        let board1 = Board::from_fen(&fen1);
+        let board2 = Board::from_fen(&fen2);
+        assert_eq!(evaluate_white(&board1), -evaluate_white(&board2));
+    }
 }

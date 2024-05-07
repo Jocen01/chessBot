@@ -1,10 +1,9 @@
-use crate::{board::Board, evaluate, singlemove::Move, transposition_table::{TranspositionsFlag, TranspositionsTable}};
+use crate::{board::Board, evaluate::{self, POSETIVE_INF, NEGATIVE_INF}, singlemove::Move, transposition_table::{TranspositionsFlag, TranspositionsTable}};
 use rand::prelude::*;
 use std::time::{Duration, Instant};
 
-// cant use i32::MIN cause if negetet it overflows
-const NEGATIVE_INF: i32 = i32::MIN + 1;
-const POSETIVE_INF: i32 = i32::MAX - 1;
+
+const WINDOW: i32 = 50;
 
 pub struct Searcher{
     traspos_table: TranspositionsTable,
@@ -19,12 +18,8 @@ impl Searcher {
             traspos_table: TranspositionsTable::new(traspos_table_size),
             searches: 0,
             start_time: Instant::now(),
-            duration: Duration::from_millis(500)
+            duration: Duration::from_millis(100)
         }
-    }
-
-    pub fn search(&mut self, board: &mut Board, depth: usize) -> (Move, i32){
-        self.search_alpha_beta(board, NEGATIVE_INF, POSETIVE_INF, depth, 0)
     }
 
     pub fn iterative_deepening(&mut self, board: &mut Board) -> (Move, i32){
@@ -32,23 +27,49 @@ impl Searcher {
         self.traspos_table.clear();
         self.searches = 0;
 
-        self.start_time = Instant::now();
         let mut best_move = Move::null_move();
         let mut val = 0;
-        for depth in 1..255{
-            let (mv, val_depth) = self.search(board, depth);
-            
+        let mut alpha = NEGATIVE_INF;
+        let mut beta = POSETIVE_INF;
+        let mut depth = 1;
+
+        self.start_time = Instant::now();
+        
+        loop {
+            let (mv, val_depth) = self.search_alpha_beta(board, alpha, beta, depth, 0);
             // return if searchtime has elapsed
             if self.start_time.elapsed() >= self.duration {
                 break;
-            }else {
-                best_move = mv;
-                val = val_depth;
             }
-        }
 
+            // We fell outside the window, so try again with a
+            // full-width window (and the same depth).
+            if (val_depth <= alpha) || (val_depth >= beta) {
+                alpha = NEGATIVE_INF;    
+                beta = POSETIVE_INF;      
+                continue;
+            }
+
+            //  // Set up the window for the next iteration.
+            alpha = val_depth - WINDOW; 
+            beta = val_depth + WINDOW;
+            
+            // update best move
+            if !mv.is_null_move(){
+                best_move = mv;
+                val = val_depth; 
+            }
+
+            // early exit if mate found
+            if evaluate::is_mate_score(val_depth){ 
+                break;
+            }
+
+            depth += 1;
+        }
         (best_move, val)
     }
+
 
     fn search_alpha_beta(&mut self, board: &mut Board, mut alpha: i32, beta: i32, depth: usize, ply: usize) -> (Move, i32){
         let mut flag = TranspositionsFlag::UpperBound;
@@ -68,6 +89,11 @@ impl Searcher {
             let val = self.search_stable_pos(board, alpha, beta);
             self.traspos_table.record_entry(zobrist, depth, val, TranspositionsFlag::Exact, None);
             return (Move::null_move(),val);
+        }
+
+        // draw by repetition
+        if ply != 0 && board.game_history_contains(zobrist){
+            return (Move::null_move(), evaluate::draw_by_repetition());
         }
 
         // init bet move
@@ -116,7 +142,7 @@ impl Searcher {
         // return 0 if stalemate else -Inf checkmate
         if moves.is_empty(){
             if board.state.in_check(board.get_turn()){
-                return (Move::null_move(), NEGATIVE_INF);
+                return (Move::null_move(), evaluate::mate_ajusted_score(ply));
             }else {
                 return (Move::null_move(),0);
             }
