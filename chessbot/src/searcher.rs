@@ -38,7 +38,7 @@ impl Searcher {
         let mut alpha = NEGATIVE_INF;
         let mut beta = POSETIVE_INF;
         let mut depth = 1;
-
+        
         self.start_time = Instant::now();
         loop {
             let (mv, val_depth) = self.search_alpha_beta(board, alpha, beta, depth, 0);
@@ -163,6 +163,12 @@ impl Searcher {
 
         let mut moves = board.get_possible_moves_turn();
 
+        // remove best found move if already seached
+        if let Some(bm) = self.traspos_table.get_best_move(zobrist) {
+            moves.retain(|mv| mv.from_to_mask() != bm.from_to_mask());
+        }
+
+        // check if specified seachmoves
         if ply == 0{
             if let Some(search_moves) = &self.search_moves{
                 moves.retain(|mv| {
@@ -190,6 +196,8 @@ impl Searcher {
                 return (Move::null_move(),0);
             }
         }
+
+        evaluate::sort_moves(&mut moves, board);
 
         for mv in moves{
             board.make_move(mv);
@@ -236,6 +244,8 @@ impl Searcher {
         //random ordering for moves before ordering is implemented
         let mut rng = rand::thread_rng();
         moves.shuffle(&mut rng);
+
+        evaluate::sort_moves(&mut moves, board);
 
         for mv in moves{
             board.make_move(mv);

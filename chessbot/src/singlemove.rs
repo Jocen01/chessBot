@@ -90,6 +90,9 @@ impl Move {
         (self.value & 0b111111) as u8
     }
 
+    pub fn from_to_mask(&self) -> u32{
+        self.value & ((1<<12) - 1)
+    }
     pub fn get_captured(&self) -> Option<usize>{
         self.captured
     }

@@ -1,4 +1,4 @@
-use crate::{board::Board, constants, state::{PiceBoards, State}, Color};
+use crate::{board::Board, constants, singlemove::Move, state::{PiceBoards, State}, Color};
 
 // cant use i32::MIN cause if negetet it overflows
 pub const NEGATIVE_INF: i32 = i32::MIN + 10000;
@@ -174,6 +174,21 @@ pub fn to_mate(score: i32) -> i32{
     let sign = if score < 0 { -1 } else { 1 };
     let sign_adjusted = if score < 0 { score } else { -score };
     (sign_adjusted - NEGATIVE_INF - 10) * sign
+}
+
+pub fn sort_moves(moves: &mut Vec<Move>, board: &Board){
+    moves.sort_by_cached_key(|mv| {
+        if let Some(captured) = board.get_pice_pos(mv.to()) {
+            if let Some(pice) = board.get_pice_pos(mv.from()) {
+                (captured.pice_type() as usize) * 100 - pice.pice_type() as usize
+            }else {
+                0
+            }
+        }else {
+            0
+        }
+    });
+    moves.reverse();
 }
 
 #[cfg(test)]
