@@ -173,7 +173,7 @@ pub fn is_mate_score(score: i32) -> bool{
 pub fn to_mate(score: i32) -> i32{
     let sign = if score < 0 { -1 } else { 1 };
     let sign_adjusted = if score < 0 { score } else { -score };
-    (sign_adjusted - NEGATIVE_INF - 10) * sign
+    ((sign_adjusted - NEGATIVE_INF - 10) * sign) / 2
 }
 
 pub fn sort_moves(moves: &mut Vec<Move>, board: &Board){

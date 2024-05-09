@@ -1,6 +1,6 @@
 use crate::{board::Board, evaluate::{self, NEGATIVE_INF, POSETIVE_INF}, singlemove::Move, transposition_table::{TranspositionsFlag, TranspositionsTable}, uci_message::UciMessage};
 use rand::prelude::*;
-use std::time::{Duration, Instant};
+use std::{collections::HashSet, time::{Duration, Instant}};
 use std::sync::mpsc::Sender;
 
 
@@ -72,12 +72,7 @@ impl Searcher {
                 best_move = mv;
                 eval = val_depth; 
             }
-
-            // early exit if mate found
-            if evaluate::is_mate_score(val_depth){ 
-                break;
-            }
-
+            
             // send info
             {
                 info.info_add_depth(depth as u8);
@@ -97,10 +92,12 @@ impl Searcher {
                 info = UciMessage::new_empty_info();
             }
 
-            depth += 1;
-            if depth > 10{
+            // early exit if mate found
+            if evaluate::is_mate_score(val_depth){ 
                 break;
             }
+
+            depth += 1;
         }
         (best_move, eval)
     }
@@ -342,9 +339,14 @@ impl Searcher {
 
     fn get_current_best_line(&mut self, board: &mut Board) -> Vec<Move>{
         let mut res = vec![];
-        while let Some(mv) = self.traspos_table.get_best_move(board.get_zobrist_hash()) {
+        let mut been: HashSet<u64> = HashSet::new();
+        let mut zob = board.get_zobrist_hash();
+        while let Some(mv) = self.traspos_table.get_best_move(zob) {
+            been.insert(zob);
             res.push(mv);
             board.make_move(mv);
+            zob = board.get_zobrist_hash();
+            if been.contains(&zob){ break; }
         }
         res.iter().for_each(|_| {
             board.undo_last_move();
