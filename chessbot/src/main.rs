@@ -1,4 +1,7 @@
-use crate::{uci_engine::UciEngine, uci_message::UciMessage};
+use std::error;
+
+use uci_engine::UciEngine;
+
 
 mod pice;
 mod board;
@@ -10,6 +13,7 @@ mod uci_message;
 mod evaluate;
 mod searcher;
 mod transposition_table;
+mod uciio;
 
 
 #[derive(Debug,PartialEq, Clone, Copy)]
@@ -110,33 +114,23 @@ fn vec_pos_to_bitmap(pos: Vec<u8>) -> u64{
     res
 }
 
-macro_rules! read_str {
-    ($out:ident) => {
-        #[allow(unused_mut)]
-        let mut inner = String::new();
-        std::io::stdin().read_line(&mut inner).expect("A String");
-        let $out = inner.trim();
-    };
-}
+// macro_rules! read_str {
+//     ($out:ident) => {
+//         #[allow(unused_mut)]
+//         let mut inner = String::new();
+//         std::io::stdin().read_line(&mut inner).expect("A String");
+//         let $out = inner.trim();
+//     };
+// }
 
-fn main() {
-    let mut engine = UciEngine::new();
-    loop {
-        read_str!(msg_str);
-        let msg = UciMessage::parse(msg_str.into());
-        match msg {
-            UciMessage::Quit => {
-                break;
-            },
-            _ => {
-                if let Some(pub_msg_vec) = engine.execute(msg) {
-                    for pub_msg in pub_msg_vec{
-                        println!("{}", pub_msg.serialize());
-                    }
-                }
-            }
-        }         
-    }
+fn main() -> Result<(), Box<dyn error::Error>> {
+    let (thread_in,rx) = uciio::new_uci_in_tread();
+    let (thread_out, tx) = uciio::new_uci_out_tread();
+    let mut engine = UciEngine::new(tx, rx);
+    engine.run()?;
+    thread_in.join().expect("something went wrong");
+    thread_out.join().expect("something went wrong");
+    Ok(())
 }
 
 

@@ -1,6 +1,8 @@
-use crate::{board::Board, evaluate::{self, POSETIVE_INF, NEGATIVE_INF}, singlemove::Move, transposition_table::{TranspositionsFlag, TranspositionsTable}};
+use crate::{board::Board, evaluate::{self, NEGATIVE_INF, POSETIVE_INF}, singlemove::Move, transposition_table::{TranspositionsFlag, TranspositionsTable}, uci_message::UciMessage};
 use rand::prelude::*;
 use std::time::{Duration, Instant};
+use std::sync::mpsc::Sender;
+
 
 
 const WINDOW: i32 = 50;
@@ -9,16 +11,20 @@ pub struct Searcher{
     traspos_table: TranspositionsTable,
     pub searches: u64,
     start_time: Instant,
-    duration: Duration
+    pub duration: Duration,
+    tx: Sender<UciMessage>,
+    search_moves: Option<Vec<String>>,
 }
 
 impl Searcher {
-    pub fn new(traspos_table_size: usize) -> Searcher{
+    pub fn new(traspos_table_size: usize, tx: Sender<UciMessage>) -> Searcher{
         Searcher{
             traspos_table: TranspositionsTable::new(traspos_table_size),
             searches: 0,
             start_time: Instant::now(),
-            duration: Duration::from_millis(100)
+            duration: Duration::from_millis(3000),
+            tx,
+            search_moves: None,
         }
     }
 
@@ -26,15 +32,14 @@ impl Searcher {
         // dont know if table needs clearing
         self.traspos_table.clear();
         self.searches = 0;
-
+        let mut info = UciMessage::new_empty_info();
         let mut best_move = Move::null_move();
-        let mut val = 0;
+        let mut eval = 0;
         let mut alpha = NEGATIVE_INF;
         let mut beta = POSETIVE_INF;
         let mut depth = 1;
 
         self.start_time = Instant::now();
-        
         loop {
             let (mv, val_depth) = self.search_alpha_beta(board, alpha, beta, depth, 0);
             // return if searchtime has elapsed
@@ -45,6 +50,14 @@ impl Searcher {
             // We fell outside the window, so try again with a
             // full-width window (and the same depth).
             if (val_depth <= alpha) || (val_depth >= beta) {
+                // send info about faild window
+                {
+                    info.info_add_string(format!("window search failed, nodes waisted {}", self.searches));
+                    self.searches = 0;
+                    self.tx.send(info).err();
+                    info = UciMessage::new_empty_info();
+                }
+
                 alpha = NEGATIVE_INF;    
                 beta = POSETIVE_INF;      
                 continue;
@@ -57,7 +70,7 @@ impl Searcher {
             // update best move
             if !mv.is_null_move(){
                 best_move = mv;
-                val = val_depth; 
+                eval = val_depth; 
             }
 
             // early exit if mate found
@@ -65,9 +78,31 @@ impl Searcher {
                 break;
             }
 
+            // send info
+            {
+                info.info_add_depth(depth as u8);
+                info.info_add_nodes(self.searches);
+                self.searches = 0;
+                if evaluate::is_mate_score(eval){
+                    info.info_add_score_mate(evaluate::to_mate(eval));
+                }else {
+                    info.info_add_score_cp(eval);
+                }
+                info.info_add_hashfull(self.traspos_table.get_permill_fill());
+                let best_line = self.get_current_best_line(board);
+                if !best_line.is_empty(){
+                    info.info_add_pv(best_line);
+                }
+                self.tx.send(info).err();
+                info = UciMessage::new_empty_info();
+            }
+
             depth += 1;
+            if depth > 10{
+                break;
+            }
         }
-        (best_move, val)
+        (best_move, eval)
     }
 
 
@@ -127,6 +162,14 @@ impl Searcher {
 
 
         let mut moves = board.get_possible_moves_turn();
+
+        if ply == 0{
+            if let Some(search_moves) = &self.search_moves{
+                moves.retain(|mv| {
+                    search_moves.contains(&mv.long_algebraic_notation())
+                });
+            }
+        }
 
         //random ordering for moves before ordering is implemented
         let mut rng = rand::thread_rng();
@@ -285,6 +328,22 @@ impl Searcher {
                 value
             }
         }
+    }
+
+    fn get_current_best_line(&mut self, board: &mut Board) -> Vec<Move>{
+        let mut res = vec![];
+        while let Some(mv) = self.traspos_table.get_best_move(board.get_zobrist_hash()) {
+            res.push(mv);
+            board.make_move(mv);
+        }
+        res.iter().for_each(|_| {
+            board.undo_last_move();
+        });
+        res
+    }
+
+    pub fn set_search_moves(&mut self,moves: Option<Vec<String>>){
+        self.search_moves = moves;
     }
 }
 

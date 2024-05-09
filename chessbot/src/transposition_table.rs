@@ -30,17 +30,21 @@ impl Entry {
 pub struct TranspositionsTable{
     hash_table: Vec<Option<Entry>>,
     size: usize,
+    nbr_filled: usize
 }
 // https://web.archive.org/web/20071031100051/http://www.brucemo.com/compchess/programming/hashing.htm
 impl TranspositionsTable {
     pub fn new(size: usize) -> TranspositionsTable{
+        // println!("entry size: {}", std::mem::size_of::<Entry>());
         TranspositionsTable{
             hash_table: (0..size).map(|_| None).collect(),
-            size
+            size,
+            nbr_filled: 0
         }
     }
 
     pub fn clear(&mut self){
+        self.nbr_filled = 0;
         self.hash_table = (0..self.size).map(|_| None).collect();
     }
 
@@ -69,6 +73,7 @@ impl TranspositionsTable {
             }
         }
         let entry = Entry::new(zobrist, depth, flag, value, best_move);
+        if let Some(_) = self.hash_table[(zobrist as usize) % self.size] { self.nbr_filled+=1 };
         self.hash_table[(zobrist as usize) % self.size] = Some(entry);
     }
 
@@ -79,5 +84,9 @@ impl TranspositionsTable {
             }
         }
         None
+    }
+
+    pub fn get_permill_fill(&self) -> u16{
+        (self.nbr_filled * 1000 / self.size) as u16
     }
 }

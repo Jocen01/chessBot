@@ -170,6 +170,11 @@ pub fn is_mate_score(score: i32) -> bool{
     score.abs() > 100000
 }
 
+pub fn to_mate(score: i32) -> i32{
+    let sign = if score < 0 { -1 } else { 1 };
+    let sign_adjusted = if score < 0 { score } else { -score };
+    (sign_adjusted - NEGATIVE_INF - 10) * sign
+}
 
 #[cfg(test)]
 mod tests {

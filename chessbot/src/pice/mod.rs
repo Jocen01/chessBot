@@ -151,18 +151,6 @@ impl Pice {
         let enemy_king_pos = enemy.king.trailing_zeros() as usize;
         let enemy_king_moves = constants::KINGS_BIT_MOVES[enemy_king_pos];
         self.moves = moves & (!enemy.capture) & (!own.bitmap_all()) & (!enemy_king_moves);
-        
-        // if Color::from_int(self.typ) == Color::White{
-        //     self.moves = moves ^ (moves & state.white_pices_bitboard);
-        //     self.moves ^= self.moves & state.black_can_move;
-        //     self.moves ^= self.moves & constants::KINGS_BIT_MOVES[state.black_king as usize]
-        // } else {
-        //     self.moves = moves ^ (moves & state.black_pices_bitboard);
-        //     self.moves ^= self.moves & state.white_can_move;
-        //     self.moves ^= self.moves & constants::KINGS_BIT_MOVES[state.white_king as usize]
-            
-        // }
-        // todo!("yet to implement casle")
     }
 
     fn gen_king_moves(&self, state: &State, captures_only: bool) -> Vec<Move>{
