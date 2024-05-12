@@ -72,6 +72,7 @@ impl UciEngine {
                 self.board = if let Some(fe) = fen { Board::from_fen(&fe) } else { Board::default() };
                 for mv in moves{
                     self.board.make_move(mv);
+                    self.board.add_state_to_history();
                 }
             },
             UciMessage::Go { 

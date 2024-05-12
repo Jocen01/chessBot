@@ -1,7 +1,8 @@
 use std::fmt;
 use std::collections::HashSet;
 
-use crate::{pice::Pice, singlemove::{Move, MoveType}, state::{CastleRights, State, Zobrist}, Color};
+use crate::{movegenerator::MoveGenerator, pice::Pice, singlemove::{Move, MoveType}, state::{CastleRights, State, Zobrist}, Color};
+const OLD_MOVEGEN: bool = false;
 
 pub struct Board{
     pub pices: Vec<Pice>,
@@ -10,13 +11,14 @@ pub struct Board{
     pub moves: Vec<Move>,
     pub state: State,
     zobrist: Zobrist,
-    game_history: HashSet<u64>
+    game_history: HashSet<u64>,
+    in_check: bool
 }
 
 impl Board {
     fn new(pices: Vec<Pice>, board: [Option<usize>;64], turn: Color, state: State) -> Board{
         let zobrist = Zobrist::from_pices(&pices, &state, turn);
-        Board { pices, board, turn, moves: vec![], state, zobrist, game_history: HashSet::new() }
+        Board { pices, board, turn, moves: vec![], state, zobrist, game_history: HashSet::new(), in_check: false }
     }
 
     pub fn default() -> Board{
@@ -50,8 +52,13 @@ impl Board {
 
 
         let mut res = Board::new(pices, board, turn, state);
-        res.update_moves(res.turn.other());
-        res.update_moves(res.turn);
+
+        // needed to pass test for old movegeneration whould be removed when the old movegen goes
+        // if OLD_MOVEGEN{
+            res.update_moves(res.turn.other());
+            res.update_moves(res.turn);
+        // }
+        
         res
     }
 
@@ -76,22 +83,30 @@ impl Board {
     }
 
     pub fn get_possible_moves(&mut self, color: Color) -> Vec<Move>{
-        let mut moves: Vec<Move> = vec![];
-        self.update_moves(color);
-        self.pices.iter_mut().filter(|p| p.color() == color && !p.is_captured()).for_each(|pice| {
-            let mut add = pice.get_moves(&self.state, false);
-            moves.append(&mut add);
-        });
-        moves.retain(|mv| {
-            self.make_move(*mv);
+        if OLD_MOVEGEN{
+            let mut moves: Vec<Move> = vec![];
+            self.update_moves(color);
+            self.pices.iter_mut().filter(|p| p.color() == color && !p.is_captured()).for_each(|pice| {
+                let mut add = pice.get_moves(&self.state, false);
+                moves.append(&mut add);
+            });
+            moves.retain(|mv| {
+                self.make_move(*mv);
 
-            self.update_moves(self.turn);
+                self.update_moves(self.turn);
 
-            let res = self.state.in_check(self.turn.other());
-            self.undo_last_move();
-            !res
-        });
-        moves
+                let res = self.state.in_check(self.turn.other());
+                self.undo_last_move();
+                !res
+            });
+            moves
+        }else {
+            let mut gm = MoveGenerator::new(&self);
+            let moves = gm.gen_moves_turn(&self, false);
+            self.in_check = gm.in_check();
+            moves
+        }
+        
     }
 
     pub fn get_possible_moves_turn(&mut self) -> Vec<Move>{
@@ -99,22 +114,28 @@ impl Board {
     }
 
     pub fn get_possible_captures(&mut self, color: Color) -> Vec<Move>{
-        let mut moves: Vec<Move> = vec![];
-        self.update_moves(color);
-        self.pices.iter_mut().filter(|p| p.color() == color && !p.is_captured()).for_each(|pice| {
-            let mut add = pice.get_moves(&self.state, true);
-            moves.append(&mut add);
-        });
-        moves.retain(|mv| {
-            self.make_move(*mv);
+        if OLD_MOVEGEN{
+            let mut moves: Vec<Move> = vec![];
+            self.update_moves(color);
+            self.pices.iter_mut().filter(|p| p.color() == color && !p.is_captured()).for_each(|pice| {
+                let mut add = pice.get_moves(&self.state, true);
+                moves.append(&mut add);
+            });
+            moves.retain(|mv| {
+                self.make_move(*mv);
 
-            self.update_moves(self.turn);
+                self.update_moves(self.turn);
 
-            let res = self.state.in_check(self.turn.other());
-            self.undo_last_move();
-            !res
-        });
-        moves
+                let res = self.state.in_check(self.turn.other());
+                self.undo_last_move();
+                !res
+            });
+            moves
+        }else {
+            let mut gm = MoveGenerator::new(&self);
+            gm.gen_moves_turn(&self, true)
+        }
+        
     }
 
     pub fn get_possible_captures_turn(&mut self) -> Vec<Move>{
@@ -221,7 +242,9 @@ impl Board {
         }
         
         self.moves.push(mv);
-        self.update_moves(self.turn);
+        if OLD_MOVEGEN{
+            self.update_moves(self.turn);
+        }
         self.turn = self.turn.other();
     }
 
@@ -309,10 +332,13 @@ impl Board {
             }
         }
         
-        self.update_moves(self.turn); // was needed before but is now only in make move
+        if OLD_MOVEGEN{ // was needed before but is now only in make move
+            self.update_moves(self.turn);
+        }
         self.turn = self.turn.other();
-        self.update_moves(self.turn); // was needed before but is now only in make move
-        
+        if OLD_MOVEGEN{ // was needed before but is now only in make move
+            self.update_moves(self.turn);
+        }
 
 
     }
@@ -383,6 +409,14 @@ impl Board {
 
     pub fn game_history_contains(&self, zobrist: u64) -> bool{
         self.game_history.contains(&zobrist)
+    }
+
+    pub fn in_check(&self) -> bool{
+        if OLD_MOVEGEN{
+            self.state.in_check(self.turn)
+        }else {
+            self.in_check
+        }
     }
 }
 
@@ -520,7 +554,7 @@ mod tests {
         assert_eq!(count_moves(&mut board, 3), 8_902);
         assert_eq!(count_moves(&mut board, 4), 197_281);
         assert_eq!(count_moves(&mut board, 5), 4_865_609);
-        // assert_eq!(count_moves(&mut board, 6), 119_060_324);
+        assert_eq!(count_moves(&mut board, 6), 119_060_324);
         // assert_eq!(count_moves(&mut board, 7), 3_195_901_860);
         // assert_eq!(count_moves(&mut board, 8), 84_998_978_956);
     }
@@ -663,9 +697,9 @@ mod tests {
 
     #[test]
     fn count_moves_pos_5_small() {
-        let mut board = Board::from_fen("rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8 ");
+        let mut board = Board::from_fen("rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8");
         assert_eq!(count_moves(&mut board, 1), 44);
-        assert_eq!(count_moves(&mut board, 2), 1_486);
+        assert_eq!(count_moves_print(&mut board, 2,1), 1_486);
         assert_eq!(count_moves(&mut board, 3), 62_379);
     }
 
@@ -685,7 +719,7 @@ mod tests {
 
     #[test]
     fn count_moves_pos_6_small() {
-        let mut board = Board::from_fen("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10 ");
+        let mut board = Board::from_fen("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10");
         assert_eq!(count_moves(&mut board, 1), 46);
         assert_eq!(count_moves(&mut board, 2), 2_079);
         assert_eq!(count_moves(&mut board, 3), 89_890);
@@ -742,6 +776,62 @@ mod tests {
         // assert_eq!(count_moves(&mut board, 8), 84_998_978_956);
     }
 
+    #[test]
+    fn checkmate(){
+        let mut board = Board::from_fen("r1bqkbnr/pppp1Qp1/2n4p/4p3/2B1P3/8/PPPP1PPP/RNB1K1NR b KQkq - 0 4");
+        let moves = board.get_possible_moves_turn();
+        assert_eq!(moves.len(), 0);
+    }
+
+    #[test]
+    fn stalemate(){
+        let mut board = Board::from_fen("6k1/8/6K1/8/3B4/2P5/5R2/8 b - - 6 81");
+        let moves = board.get_possible_moves_turn();
+        assert_eq!(moves.len(), 0);
+    }
+
+    #[test]
+    fn double_check(){
+        let mut board = Board::from_fen("rn1qkbnr/p1N1pppp/8/5b2/Q1p5/8/PP1PPPPP/R1B1KBNR b KQkq - 0 5");
+        let moves = board.get_possible_moves_turn();
+        assert_eq!(moves.len(), 0);
+    }
+
+    #[test]
+    fn en_passant_pinned(){
+        let mut board = Board::from_fen("3br1k1/3q1ppp/p7/3P1P2/8/P6K/7P/8 b - - 0 36");
+        board.make_move(Move::new(54, 38, MoveType::Pawndubblemove));
+        let moves = board.get_possible_moves_turn();
+        assert_eq!(moves.len(), 5);
+    }
+
+    #[test]
+    fn discoverd_double_check(){
+        let mut board = Board::from_fen("8/r7/3Q4/k2P1B1P/1PP5/6P1/1P1b1P2/R5K1 b - - 0 45");
+        let moves = board.get_possible_moves_turn();
+        assert_eq!(moves.len(), 0);
+    }
+
+    #[test]
+    fn discoverd_check_pawn_double_move_passant(){
+        let mut board = Board::from_fen("rq5r/bbpp2pp/2p3k1/8/1p1P4/P5BP/2P2PP1/1Q2RRK1 w - - 0 23");
+        board.make_move(Move::new(10, 26, MoveType::Pawndubblemove));
+        let moves = board.get_possible_moves_turn();
+        assert_eq!(moves.len(), 5);
+        
+        let mut board = Board::from_fen("1q2rrk1/2p2pp1/p5bp/1P1p4/8/2P3K1/BBPP2PP/RQ5R b - - 0 23");
+        board.make_move(Move::new(50, 34, MoveType::Pawndubblemove));
+        let moves = board.get_possible_moves_turn();
+        assert_eq!(moves.len(), 5);
+    }
+
+    #[test]
+    fn one_leagal_move(){
+        let mut board = Board::from_fen("8/8/7p/3KNN1k/2p4p/8/3P2p1/8 w - - 0 1");
+        board.make_move(Move::new(37, 54, MoveType::Normal));
+        let moves = board.get_possible_moves_turn();
+        assert_eq!(moves.len(), 1);
+    }
 
     #[test]
     fn king_close_to_king(){
@@ -761,9 +851,12 @@ mod tests {
         if depth == 0{ 
             // println!("{}", board);
             // assert_eq!(board.pices.iter().filter(|p| p.color() == Color::White).count(),board.pices.iter().filter(|p| p.color() == Color::Black).count());
-
+            
             return 1;
         }
+        // let mut mg = MoveGenerator::new(&board);
+        // let moves = mg.gen_moves_turn(board, false);
+        // println!("moves: {:?}", moves);
         let moves = board.get_possible_moves(board.turn);
 
         // let nbr_castle = moves.iter().filter(|mv| mv.move_type() == MoveType::Castle).count();
@@ -783,6 +876,9 @@ mod tests {
             // println!("{}", board);
             return 1;
         }
+        // let mut mg = MoveGenerator::new(&board);
+        // let moves = mg.gen_moves_turn(board, false);
+
         let moves = board.get_possible_moves(board.turn);
         // let nbr_castle = moves.iter().filter(|mv| mv.move_type() == MoveType::Castle).count();
         // println!("nbr castle {}", nbr_castle);

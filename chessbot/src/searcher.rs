@@ -107,6 +107,12 @@ impl Searcher {
         let mut flag = TranspositionsFlag::UpperBound;
         let zobrist = board.get_zobrist_hash();
         self.searches += 1;
+        // println!("depth: {}, ply: {}",depth, ply);
+        // draw by repetition
+        if ply != 0 && board.game_history_contains(zobrist){
+            // println!("draw");
+            return (Move::null_move(), evaluate::draw_by_repetition());
+        }
 
         // lookup the position if it exists in the table
         if let Some(val) = self.traspos_table.lookup_eval(zobrist, depth, alpha, beta){
@@ -123,20 +129,15 @@ impl Searcher {
             return (Move::null_move(),val);
         }
 
-        // draw by repetition
-        if ply != 0 && board.game_history_contains(zobrist){
-            return (Move::null_move(), evaluate::draw_by_repetition());
-        }
-
         // init bet move
         let mut best_move = Move::null_move();        
 
         // start with the previous best move in the position
         if let Some(mv) = self.traspos_table.get_best_move(zobrist) {
-            assert!(!mv.is_null_move());
             board.make_move(mv);
             let (_,mut val) = self.search_alpha_beta(board, -beta, -alpha, depth - 1, ply + 1);
             val = -val;
+            
             board.undo_last_move();
 
             //branch can be pruned
@@ -157,8 +158,16 @@ impl Searcher {
             }
         }
 
-
         let mut moves = board.get_possible_moves_turn();
+
+        // return 0 if stalemate else -Inf checkmate
+        if moves.is_empty(){
+            if board.in_check(){
+                return (Move::null_move(), evaluate::mate_ajusted_score(ply));
+            }else {
+                return (Move::null_move(),0);
+            }
+        }
 
         // remove best found move if already seached
         if let Some(bm) = self.traspos_table.get_best_move(zobrist) {
@@ -185,21 +194,13 @@ impl Searcher {
             }
         }
 
-        // return 0 if stalemate else -Inf checkmate
-        if moves.is_empty(){
-            if board.state.in_check(board.get_turn()){
-                return (Move::null_move(), evaluate::mate_ajusted_score(ply));
-            }else {
-                return (Move::null_move(),0);
-            }
-        }
-
         evaluate::sort_moves(&mut moves, board);
-
+        // println!("bestmv: {}, alpha: {}, beta: {}",best_move.long_algebraic_notation(),alpha,beta);
         for mv in moves{
             board.make_move(mv);
             let (_,mut val) = self.search_alpha_beta(board, -beta, -alpha, depth - 1, ply + 1);
             val = -val;
+            // println!("mv: {}, val: {}", mv.long_algebraic_notation(), val);
             board.undo_last_move();
 
             //branch can be pruned

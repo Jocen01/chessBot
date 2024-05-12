@@ -14,6 +14,7 @@ mod evaluate;
 mod searcher;
 mod transposition_table;
 mod uciio;
+mod movegenerator;
 
 
 #[derive(Debug,PartialEq, Clone, Copy)]

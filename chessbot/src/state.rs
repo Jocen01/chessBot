@@ -40,7 +40,7 @@ impl CastleRights {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct PiceBoards{
     pub capture: u64,
     pub king: u64,
@@ -143,7 +143,7 @@ impl PiceBoards {
 
     pub fn remove_pice(&mut self, pos: u8, pice: &Pice){
         match pice.pice_type() {
-            PiceType::King => panic!("king can't be removed"),
+            PiceType::King => panic!("king can't be removed, pos: {}",pos),
             PiceType::Queen => {
                 self.diagonal_sliders ^= 1<<pos; 
                 self.orthoganal_sliders^=1<<pos;
@@ -269,7 +269,7 @@ impl Zobrist {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct State{
     pub white: PiceBoards,
     pub black: PiceBoards,

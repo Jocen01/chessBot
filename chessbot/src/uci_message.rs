@@ -151,8 +151,6 @@ impl UciMessage {
                     }).for_each(|mv| {
                         moves_res.push(*mv);
                         board.make_move(*mv);
-                        board.add_state_to_history();
-
                     });
                 });
             }
