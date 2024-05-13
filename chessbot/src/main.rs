@@ -15,6 +15,7 @@ mod searcher;
 mod transposition_table;
 mod uciio;
 mod movegenerator;
+mod openingbook;
 
 
 #[derive(Debug,PartialEq, Clone, Copy)]

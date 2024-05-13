@@ -418,6 +418,35 @@ impl Board {
             self.in_check
         }
     }
+
+    pub fn move_from_long_algebraic_notation(&mut self, mv_long: String) -> Option<Move>{
+        let moves = self.get_possible_moves_turn();
+        for mv in moves{
+            if mv.long_algebraic_notation() == mv_long{
+                return Some(mv);
+            }
+        }
+        None
+    }
+
+    pub fn make_null_move(&mut self){
+        self.state.passant = 0;
+        self.turn = self.turn.other();
+        self.moves.push(Move::null_move());
+    }
+
+    pub fn undo_null_move(&mut self){
+        self.moves.pop();
+        self.turn = self.turn.other();
+        if let Some(mv) = self.moves.last(){
+            match mv.move_type() {
+                MoveType::Pawndubblemove => {
+                    self.state.passant = 1<<((mv.from() + mv.to())/2);
+                },
+                _ => {}
+            }
+        }
+    }
 }
 
 

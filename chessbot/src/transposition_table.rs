@@ -73,7 +73,7 @@ impl TranspositionsTable {
             }
         }
         let entry = Entry::new(zobrist, depth, flag, value, best_move);
-        if let Some(_) = self.hash_table[(zobrist as usize) % self.size] { self.nbr_filled+=1 };
+        if let None = self.hash_table[(zobrist as usize) % self.size] { self.nbr_filled+=1 };
         self.hash_table[(zobrist as usize) % self.size] = Some(entry);
     }
 

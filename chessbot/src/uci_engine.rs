@@ -1,4 +1,4 @@
-use crate::{board::Board, searcher::Searcher, singlemove::Move, uci_message::UciMessage};
+use crate::{board::Board, openingbook::Book, searcher::Searcher, singlemove::Move, uci_message::UciMessage};
 use rand::prelude::*;
 use std::{sync::mpsc::{Receiver, RecvError, SendError, Sender}, time::Duration};
 
@@ -11,7 +11,9 @@ pub struct UciEngine {
     settings: String,
     debug: bool,
     tx: Sender<UciMessage>,
-    rx: Receiver<UciMessage>
+    rx: Receiver<UciMessage>,
+    book: Book,
+    in_book: bool
 }
 
 impl UciEngine {
@@ -19,11 +21,13 @@ impl UciEngine {
     pub fn new(tx: Sender<UciMessage>, rx: Receiver<UciMessage>) -> UciEngine{
         UciEngine { 
             board: Board::default(),
-            searcher: Searcher::new(1000000, tx.clone()), 
+            searcher: Searcher::new(10000000, tx.clone()), 
             settings: "".into(), 
             debug: false,
             tx,
-            rx
+            rx,
+            book: Book::new(),
+            in_book: false
         }
     }
 
@@ -69,9 +73,19 @@ impl UciEngine {
                 // self.searcher.clear(); TODO
             },
             UciMessage::Position { fen, moves } => {
-                self.board = if let Some(fe) = fen { Board::from_fen(&fe) } else { Board::default() };
+                self.board = if let Some(fe) = fen { 
+                    self.in_book = false;
+                    Board::from_fen(&fe) 
+                } else { 
+                    self.in_book = true;
+                    self.book = Book::new();
+                    Board::default() 
+                };
                 for mv in moves{
                     self.board.make_move(mv);
+                    if self.in_book{
+                        self.book.play_move(&mv);
+                    }
                     self.board.add_state_to_history();
                 }
             },
@@ -86,7 +100,23 @@ impl UciEngine {
                 }else {
                     self.searcher.duration = DEFAULT_SEARCH_TIME;
                 }
-                let mv = self.best_move();
+                let mut mv = Move::null_move();
+                if self.in_book{
+                    if let Some((book_move, name)) = self.book.get_random_move() {
+                        mv = book_move;
+                        //info
+                        {
+                            let mut info = UciMessage::new_empty_info();
+                            info.info_add_string(format!("bookmove from opening {}", name));
+                            self.tx.send(info)?;
+                        }
+                    }else {
+                        self.in_book = false;
+                    }
+                }
+                if mv.is_null_move(){
+                    mv = self.best_move();
+                }
                 let res = UciMessage::BestMove { best_move: mv, ponder: None };
                 self.tx.send(res)?;
             },

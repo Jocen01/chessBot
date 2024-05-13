@@ -4,7 +4,8 @@ use std::{collections::HashSet, time::{Duration, Instant}};
 use std::sync::mpsc::Sender;
 
 
-
+const MAX_EXTENTIONS: usize = 2;
+const NULL_MOVE_REDUCTION: usize = 2;
 const WINDOW: i32 = 50;
 
 pub struct Searcher{
@@ -41,7 +42,7 @@ impl Searcher {
         
         self.start_time = Instant::now();
         loop {
-            let (mv, val_depth) = self.search_alpha_beta(board, alpha, beta, depth, 0);
+            let (mv, val_depth) = self.search_alpha_beta(board, alpha, beta, depth, 0, 0);
             // return if searchtime has elapsed
             if self.start_time.elapsed() >= self.duration {
                 break;
@@ -63,7 +64,7 @@ impl Searcher {
                 continue;
             }
 
-            //  // Set up the window for the next iteration.
+            // Set up the window for the next iteration.
             alpha = val_depth - WINDOW; 
             beta = val_depth + WINDOW;
             
@@ -103,14 +104,13 @@ impl Searcher {
     }
 
 
-    fn search_alpha_beta(&mut self, board: &mut Board, mut alpha: i32, beta: i32, depth: usize, ply: usize) -> (Move, i32){
+    fn search_alpha_beta(&mut self, board: &mut Board, mut alpha: i32, beta: i32, depth: usize, ply: usize, extentions: usize) -> (Move, i32){
         let mut flag = TranspositionsFlag::UpperBound;
         let zobrist = board.get_zobrist_hash();
         self.searches += 1;
-        // println!("depth: {}, ply: {}",depth, ply);
+
         // draw by repetition
         if ply != 0 && board.game_history_contains(zobrist){
-            // println!("draw");
             return (Move::null_move(), evaluate::draw_by_repetition());
         }
 
@@ -130,12 +130,15 @@ impl Searcher {
         }
 
         // init bet move
-        let mut best_move = Move::null_move();        
+        let mut best_move = Move::null_move();    
 
+        let mut moves = board.get_possible_moves_turn();
+        let check = board.in_check();    
+        let extend = if check && extentions < MAX_EXTENTIONS { 1 } else { 0 };
         // start with the previous best move in the position
         if let Some(mv) = self.traspos_table.get_best_move(zobrist) {
             board.make_move(mv);
-            let (_,mut val) = self.search_alpha_beta(board, -beta, -alpha, depth - 1, ply + 1);
+            let (_,mut val) = self.search_alpha_beta(board, -beta, -alpha, depth - 1 + extend, ply + 1, extentions + extend);
             val = -val;
             
             board.undo_last_move();
@@ -158,8 +161,6 @@ impl Searcher {
             }
         }
 
-        let mut moves = board.get_possible_moves_turn();
-
         // return 0 if stalemate else -Inf checkmate
         if moves.is_empty(){
             if board.in_check(){
@@ -174,7 +175,7 @@ impl Searcher {
             moves.retain(|mv| mv.from_to_mask() != bm.from_to_mask());
         }
 
-        // check if specified seachmoves
+        // check if specified seachmoves from gui
         if ply == 0{
             if let Some(search_moves) = &self.search_moves{
                 moves.retain(|mv| {
@@ -194,13 +195,23 @@ impl Searcher {
             }
         }
 
+        // nullmove reduction
+        if ply != 0 && depth >= 3 && !check && (board.state.white.bitmap_all() | board.state.black.bitmap_all()).count_ones() > 10{
+            board.make_null_move();
+            let (_, mut val) = self.search_alpha_beta(board, -beta, -beta + 1, depth - 1 - NULL_MOVE_REDUCTION, ply + 1, extentions);
+            val = -val;
+            board.undo_null_move();
+            if val >= beta{
+                return (Move::null_move(),beta);
+            }
+        }
+        
         evaluate::sort_moves(&mut moves, board);
-        // println!("bestmv: {}, alpha: {}, beta: {}",best_move.long_algebraic_notation(),alpha,beta);
+
         for mv in moves{
             board.make_move(mv);
-            let (_,mut val) = self.search_alpha_beta(board, -beta, -alpha, depth - 1, ply + 1);
+            let (_,mut val) = self.search_alpha_beta(board, -beta, -alpha, depth - 1 + extend, ply + 1, extentions + extend);
             val = -val;
-            // println!("mv: {}, val: {}", mv.long_algebraic_notation(), val);
             board.undo_last_move();
 
             //branch can be pruned

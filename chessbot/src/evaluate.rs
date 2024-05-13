@@ -35,7 +35,8 @@ fn sum_pice_values(pice_board: &PiceBoards) -> i32{
 fn evaluate_white(board: &Board) -> i32{
     let mut eval = evaluate_pice_pos(board);
     eval += eval_past_pawns(&board.state);
-    eval += mobility_score(&board.state);
+    eval += isolated_pawns(&board.state);
+    // eval += mobility_score(&board.state);
     eval += rooks_on_open_files(&board.state);
     eval += doubled_pawns(&board.state);
     eval
@@ -88,20 +89,31 @@ fn eval_past_pawns(state: &State) -> i32{
     let value_past_pawns_white: i32 = white_pawns.iter().filter(|&pos| {
         constants::PASTPAWN_WHITE_MASK[*pos as usize] & state.black.pawns == 0
     }).map(|pos| {
-        constants::PASSED_PAWNS_VALUE[(pos>>3) as usize]
+        let mut v = constants::PASSED_PAWNS_VALUE[(pos>>3) as usize];
+        if constants::FILES_MASK[(pos & 0b111) as usize] & ((1<<pos)-1) & state.white.orthoganal_sliders != 0{
+            v *= 7;
+            v /= 5;
+        }
+        v
     }).sum();
 
     let black_pawns = get_set_bits(&state.black.pawns);
     let value_past_pawns_black: i32 = black_pawns.iter().filter(|&pos| {
         constants::PASTPAWN_BLACK_MASK[*pos as usize] & state.white.pawns == 0
     }).map(|pos| {
-        constants::PASSED_PAWNS_VALUE[(8 - (pos>>3)) as usize]
+        let mut v = constants::PASSED_PAWNS_VALUE[(8 - (pos>>3)) as usize];
+        if constants::FILES_MASK[(pos & 0b111) as usize] & (!((1<<pos)-1)) & state.black.orthoganal_sliders != 0{
+            v *= 7;
+            v /= 5;
+        }
+        v
     }).sum();
 
     value_past_pawns_white - value_past_pawns_black
 
 }
 
+#[allow(dead_code)]
 fn mobility_score(state: &State) -> i32{
     ((state.white.capture.count_ones() as i32) - (state.black.capture.count_ones() as i32)) * 5
 }
@@ -113,9 +125,9 @@ fn rooks_on_open_files(state: &State) -> i32{
             let mask = constants::FILES_MASK[*pos as usize & 0b111];
             if mask & own.pawns == 0{
                 if mask & opponent.pawns == 0{
-                    20
+                    30
                 }else {
-                    8
+                    10
                 }
             }else {
                 0
@@ -136,6 +148,24 @@ fn doubled_pawns(state: &State) -> i32{
         }
     }
     eval
+}
+
+fn isolated_pawns(state: &State) -> i32{
+    fn help(pawns: u64) -> i32{
+        get_set_bits(&pawns).iter()
+        .map(|pos| {
+            if pos & 0b111 == 0 {
+                constants::FILES_MASK[1]
+            }else if pos & 0b111 == 0b111 {
+                constants::FILES_MASK[6]
+            }else{
+                constants::FILES_MASK[((pos - 1) & 0b111) as usize] | constants::FILES_MASK[((pos + 1) & 0b111) as usize]
+            }
+        }).filter(|mask| mask & pawns == 0)
+        .map(|_| -5).sum()
+    }
+
+    help(state.white.pawns) - help(state.black.pawns)
 }
 
 #[allow(dead_code)]
