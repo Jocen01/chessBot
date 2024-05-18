@@ -16,6 +16,7 @@ mod transposition_table;
 mod uciio;
 mod movegenerator;
 mod openingbook;
+mod magic;
 
 
 #[derive(Debug,PartialEq, Clone, Copy)]
@@ -126,6 +127,7 @@ fn vec_pos_to_bitmap(pos: Vec<u8>) -> u64{
 // }
 
 fn main() -> Result<(), Box<dyn error::Error>> {
+    magic::setup(); //set up magics, not needed but will speed up the first movegeneration a bit by not having to do it during the first search
     let (thread_in,rx) = uciio::new_uci_in_tread();
     let (thread_out, tx) = uciio::new_uci_out_tread();
     let mut engine = UciEngine::new(tx, rx);

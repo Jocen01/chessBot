@@ -33,16 +33,17 @@ fn sum_pice_values(pice_board: &PiceBoards) -> i32{
 }
 
 fn evaluate_white(board: &Board) -> i32{
-    let mut eval = evaluate_pice_pos(board);
+    let (mut eval, _mg_phase, _eg_phase) = evaluate_pice_pos(board);
     eval += eval_past_pawns(&board.state);
     eval += isolated_pawns(&board.state);
     // eval += mobility_score(&board.state);
     eval += rooks_on_open_files(&board.state);
     eval += doubled_pawns(&board.state);
+    // eval += king_endgame(&board.state, eval, _eg_phase);
     eval
 }
 
-fn evaluate_pice_pos(board: &Board) -> i32{
+fn evaluate_pice_pos(board: &Board) -> (i32, i32, i32){
     let mut mg: [i32;2] = [0,0];
     let mut eg: [i32;2] = [0,0];
     let mut game_phase = 0;
@@ -64,7 +65,7 @@ fn evaluate_pice_pos(board: &Board) -> i32{
     let mut mg_phase = game_phase;
     if mg_phase > 24 {mg_phase = 24;}; /* in case of early promotion */
     let eg_phase = 24 - mg_phase;
-    return (mg_score * mg_phase + eg_score * eg_phase) / 24;
+    return ((mg_score * mg_phase + eg_score * eg_phase) / 24, mg_phase, eg_phase);
 }
 
 fn get_set_bits(pos: &u64) -> Vec<u8>{
@@ -166,6 +167,21 @@ fn isolated_pawns(state: &State) -> i32{
     }
 
     help(state.white.pawns) - help(state.black.pawns)
+}
+
+#[allow(dead_code)]
+fn king_endgame(state: &State, eval: i32, eg_phase: i32) -> i32{
+    fn help(own: &PiceBoards, opponent: &PiceBoards, eg_phase: i32) -> i32{
+        let pos = own.king.trailing_zeros();
+        let mut eval = 0;
+        if pos < 56 && (own.king << 8) & opponent.pawns != 0{
+            eval += 14 * eg_phase / 24;
+        }
+        eval
+    }
+    let king_distance = ((state.white.king & 0b111) + (state.black.king & 0b111)/2).max((state.white.king & 0b111000) + (state.black.king & 0b111000)/2) as i32;
+    let distance_eval = eval * king_distance * (eg_phase - 12) / (150 * 24);
+    help(&state.white, &state.black, eg_phase) - help(&state.black, &state.white, eg_phase) + distance_eval
 }
 
 #[allow(dead_code)]

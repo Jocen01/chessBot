@@ -42,7 +42,7 @@ impl Searcher {
         
         self.start_time = Instant::now();
         loop {
-            let (mv, val_depth) = self.search_alpha_beta(board, alpha, beta, depth, 0, 0);
+            let (mv, val_depth) = self.search_alpha_beta(board, alpha, beta, depth, 0, 0, true);
             // return if searchtime has elapsed
             if self.start_time.elapsed() >= self.duration {
                 break;
@@ -104,7 +104,7 @@ impl Searcher {
     }
 
 
-    fn search_alpha_beta(&mut self, board: &mut Board, mut alpha: i32, beta: i32, depth: usize, ply: usize, extentions: usize) -> (Move, i32){
+    fn search_alpha_beta(&mut self, board: &mut Board, mut alpha: i32, beta: i32, depth: usize, ply: usize, extentions: usize, prev_nullmove: bool) -> (Move, i32){
         let mut flag = TranspositionsFlag::UpperBound;
         let zobrist = board.get_zobrist_hash();
         self.searches += 1;
@@ -138,7 +138,7 @@ impl Searcher {
         // start with the previous best move in the position
         if let Some(mv) = self.traspos_table.get_best_move(zobrist) {
             board.make_move(mv);
-            let (_,mut val) = self.search_alpha_beta(board, -beta, -alpha, depth - 1 + extend, ply + 1, extentions + extend);
+            let (_,mut val) = self.search_alpha_beta(board, -beta, -alpha, depth - 1 + extend, ply + 1, extentions + extend, false);
             val = -val;
             
             board.undo_last_move();
@@ -196,9 +196,9 @@ impl Searcher {
         }
 
         // nullmove reduction
-        if ply != 0 && depth >= 3 && !check && (board.state.white.bitmap_all() | board.state.black.bitmap_all()).count_ones() > 10{
+        if !prev_nullmove && depth >= 3 && !check && (board.state.white.bitmap_all() | board.state.black.bitmap_all()).count_ones() > 10{
             board.make_null_move();
-            let (_, mut val) = self.search_alpha_beta(board, -beta, -beta + 1, depth - 1 - NULL_MOVE_REDUCTION, ply + 1, extentions);
+            let (_, mut val) = self.search_alpha_beta(board, -beta, -beta + 1, depth - 1 - NULL_MOVE_REDUCTION, ply + 1, extentions, true);
             val = -val;
             board.undo_null_move();
             if val >= beta{
@@ -210,7 +210,7 @@ impl Searcher {
 
         for mv in moves{
             board.make_move(mv);
-            let (_,mut val) = self.search_alpha_beta(board, -beta, -alpha, depth - 1 + extend, ply + 1, extentions + extend);
+            let (_,mut val) = self.search_alpha_beta(board, -beta, -alpha, depth - 1 + extend, ply + 1, extentions + extend, false);
             val = -val;
             board.undo_last_move();
 

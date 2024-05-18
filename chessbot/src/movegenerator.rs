@@ -1,8 +1,10 @@
-use crate::{board::Board, constants, singlemove::{Move, MoveType}, state::{CastleRights, PiceBoards, State}, Color};
+use crate::{board::Board, constants, magic, singlemove::{Move, MoveType}, state::{CastleRights, PiceBoards, State}, Color};
 
 const QUEENSIDE_CASTLE_MASK_CAPTURE: u64 = 0b1100;
 const QUEENSIDE_CASTLE_MASK_PICES: u64 = 0b1110;
 const KINGSIDE_CASTLE_MASK: u64 = 0b1100000;
+
+const MAGICS: bool = true;
 
 pub struct MoveGenerator{
     own: PiceBoards,
@@ -328,6 +330,9 @@ impl MoveGenerator {
     }
 
     fn orthogonal_mask(&self, pos: u8, blockers: u64) -> u64{
+        if MAGICS{
+            return magic::get_orthogonal_moves(pos as usize, blockers);
+        }
         let file = pos & 0b111;
         let rank = pos & 0b111000;
         let mut moves: u64 = 0;
@@ -351,6 +356,9 @@ impl MoveGenerator {
     }
 
     fn diagonal_mask(&self, pos: u8, blockers: u64) -> u64{
+        if MAGICS{
+            return magic::get_diagonal_moves(pos as usize, blockers);
+        }
         let mut moves = 0;
         let file = pos & 0b111;
         let rank = (pos>>3) & 0b111;
