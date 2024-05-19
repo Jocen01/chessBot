@@ -1,6 +1,13 @@
-use crate::{board::Board, openingbook::Book, searcher::Searcher, singlemove::Move, uci_message::UciMessage};
+use crate::{board::Board, engine::openingbook::Book, engine::searcher::Searcher, movegeneration::singlemove::Move, uci::uci_message::UciMessage};
 use rand::prelude::*;
 use std::{sync::mpsc::{Receiver, RecvError, SendError, Sender}, time::Duration};
+
+mod evaluate;
+mod searcher;
+mod transposition_table;
+mod openingbook;
+
+
 
 const DEFAULT_SEARCH_TIME: Duration = Duration::from_millis(3000);
 
@@ -21,7 +28,7 @@ impl UciEngine {
     pub fn new(tx: Sender<UciMessage>, rx: Receiver<UciMessage>) -> UciEngine{
         UciEngine { 
             board: Board::default(),
-            searcher: Searcher::new(10000000, tx.clone()), 
+            searcher: Searcher::new(5000000, tx.clone()), 
             settings: "".into(), 
             debug: false,
             tx,
@@ -70,7 +77,7 @@ impl UciEngine {
             },
             UciMessage::UciNewGame => {
                 self.board = Board::default();
-                // self.searcher.clear(); TODO
+                self.searcher.reset();
             },
             UciMessage::Position { fen, moves } => {
                 self.board = if let Some(fe) = fen { 
@@ -92,6 +99,7 @@ impl UciEngine {
             UciMessage::Go { 
                     search_moves,
                     move_time,
+                    depth,
                     .. 
                 } => {
                 self.searcher.set_search_moves(search_moves);
@@ -115,7 +123,7 @@ impl UciEngine {
                     }
                 }
                 if mv.is_null_move(){
-                    mv = self.best_move();
+                    mv = self.best_move(depth);
                 }
                 let res = UciMessage::BestMove { best_move: mv, ponder: None };
                 self.tx.send(res)?;
@@ -124,7 +132,7 @@ impl UciEngine {
                 panic!("not implemented")
             },
             UciMessage::Stop => {
-                let mv = self.best_move();
+                let mv = self.best_move(Some(1));
                 let res = UciMessage::BestMove { best_move: mv, ponder: None };
                 self.tx.send(res)?;
             },
@@ -155,20 +163,9 @@ impl UciEngine {
         "alfa-beta-bot"
     }
 
-    fn best_move(&mut self) -> Move{
-        // let mut moves = self.board.get_possible_moves_turn();
-        // let mut rng = rand::thread_rng();
-
-        // moves.shuffle(&mut rng);
-        // if let Some(mv) = moves.first() {
-        //     *mv
-        // }else {
-        //     panic!("no leagal moves")
-        // }
-        // let (mv, _score) = self.searcher.search(&mut self.board, 4);
-        let (mv, _score) = self.searcher.iterative_deepening(&mut self.board);
+    fn best_move(&mut self, depth: Option<u8>) -> Move{
+        let (mv, _score) = self.searcher.iterative_deepening(&mut self.board, depth);
         
-        // if no move was found play a random move
         if mv.is_null_move(){
             let mut moves = self.board.get_possible_moves_turn();
             let mut rng = rand::thread_rng();

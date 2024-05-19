@@ -1,4 +1,4 @@
-use crate::singlemove::Move;
+use crate::movegeneration::singlemove::Move;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum TranspositionsFlag{

@@ -1,35 +1,14 @@
-use crate::{board::Board, constants, singlemove::Move, state::{PiceBoards, State}, Color};
+use crate::{board::Board, constants, movegeneration::singlemove::Move, board::state::{PiceBoards, State}, board::color::Color};
 
 // cant use i32::MIN cause if negetet it overflows
 pub const NEGATIVE_INF: i32 = i32::MIN + 10000;
 pub const POSETIVE_INF: i32 = i32::MAX - 10000;
-
-#[allow(dead_code)]
-pub fn evaluate_white_old(board: &Board) -> i32{
-    let white = sum_pice_values(&board.state.white);
-    let black = sum_pice_values(&board.state.black);
-    white - black
-}
 
 pub fn evaluate_turn(board: &Board) -> i32{
     match board.get_turn() {
         Color::White => evaluate_white(board),
         Color::Black => -evaluate_white(board)
     }
-}
-
-#[allow(dead_code)]
-fn sum_pice_values(pice_board: &PiceBoards) -> i32{
-    let mut value = 0;
-    value += constants::PAWN_VALUE * pice_board.pawns.count_ones() as i32;
-    value += constants::KNIGHT_VALUE * pice_board.knights.count_ones() as i32;
-    let queens = pice_board.diagonal_sliders & pice_board.orthoganal_sliders;
-    let rooks = queens ^ pice_board.orthoganal_sliders;
-    let bishops = queens ^ pice_board.diagonal_sliders;
-    value += constants::BISHOP_VALUE * bishops.count_ones() as i32;
-    value += constants::ROOK_VALUE * rooks.count_ones() as i32;
-    value += constants::QUEEN_VALUE * queens.count_ones() as i32;
-    value
 }
 
 fn evaluate_white(board: &Board) -> i32{
@@ -205,7 +184,7 @@ fn bishops_on_open_diagonals(state: &State) -> i32{
 }
 
 pub fn draw_by_repetition() -> i32{
-    -50
+    50
 }
 
 pub fn mate_ajusted_score(ply: usize) -> i32{
@@ -239,7 +218,7 @@ pub fn sort_moves(moves: &mut Vec<Move>, board: &Board){
 
 #[cfg(test)]
 mod tests {
-    use crate::{board::Board, evaluate::evaluate_white};
+    use crate::{board::Board, engine::evaluate::evaluate_white};
 
     #[test]
     fn same_eval_both_sides(){

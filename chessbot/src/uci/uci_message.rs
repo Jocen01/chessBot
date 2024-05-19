@@ -1,4 +1,4 @@
-use crate::{board::Board, singlemove::{MoveType,Move}};
+use crate::{board::Board, movegeneration::singlemove::{MoveType,Move}};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Score{
@@ -253,6 +253,9 @@ impl UciMessage {
                 push_variable(&mut s, "time", time);
                 push_variable(&mut s, "nodes", nodes);
                 if let Some(Score { cp, mate, lowerbound, upperbound }) = score {
+                    if cp.is_some() || mate.is_some() || lowerbound.is_some() || upperbound.is_some(){
+                        s.push(format!(" score"));
+                    }
                     push_variable(&mut s, "cp", cp);
                     push_variable(&mut s, "mate", mate);
                     push_variable(&mut s, "lowerbound", lowerbound);

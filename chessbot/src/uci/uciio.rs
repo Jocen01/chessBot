@@ -1,7 +1,7 @@
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread::{self, JoinHandle};
 
-use crate::uci_message::UciMessage;
+use crate::uci::uci_message::UciMessage;
 
 macro_rules! read_str {
     ($out:ident) => {

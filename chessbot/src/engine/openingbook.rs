@@ -1,4 +1,4 @@
-use crate::{board::Board, singlemove::Move};
+use crate::{board::Board, movegeneration::singlemove::Move};
 use rand::prelude::*;
 
 const SPECIFIC_OPENING: Option<&str> = None;

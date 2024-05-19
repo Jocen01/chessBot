@@ -1,7 +1,11 @@
 use std::fmt;
 use std::collections::HashSet;
+pub mod pice;
+pub mod state;
+pub mod color;
+mod zobrist;
 
-use crate::{movegenerator::MoveGenerator, pice::Pice, singlemove::{Move, MoveType}, state::{CastleRights, State, Zobrist}, Color};
+use crate::{movegeneration::movegenerator::MoveGenerator, board::pice::Pice, movegeneration::singlemove::{Move, MoveType}, board::{state::{CastleRights, State}, zobrist::Zobrist}, board::color::Color};
 const OLD_MOVEGEN: bool = false;
 
 pub struct Board{
@@ -394,9 +398,9 @@ impl Board {
         self.zobrist.get()
     }
 
-    pub fn is_white(&self) -> bool{
-        self.turn == Color::White
-    }
+    // pub fn is_white(&self) -> bool{
+    //     self.turn == Color::White
+    // }
 
     pub fn get_turn(&self) -> Color{
         self.turn
@@ -449,8 +453,6 @@ impl Board {
     }
 }
 
-
-
 impl fmt::Display for Board {
     // This trait requires `fmt` with this exact signature.
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -479,7 +481,7 @@ impl fmt::Display for Board {
 mod tests {
     use std::collections::HashMap;
 
-    use crate::{board::Board, pice::Pice, singlemove::{Move, MoveType}, Color, PiceType};
+    use crate::{board::Board, board::pice::{PiceType, Pice}, movegeneration::singlemove::{Move, MoveType}, board::color::Color};
 
     #[test]
     fn fen_default() {
@@ -964,11 +966,3 @@ mod tests {
         res
     }
 }
-
-
-// problems with moves
-// 1. an pessant
-// 2. casle
-// 3. pins
-// 4. checks
-// 5. promotions

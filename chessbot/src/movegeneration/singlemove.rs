@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::state::CastleRights;
+use crate::board::state::CastleRights;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub enum MoveType {
@@ -35,7 +35,6 @@ impl Move {
         Move { value: 0, captured: None }
     }
 
-    #[allow(dead_code)]
     pub fn is_null_move(&self) -> bool{
         self.value == 0
     }

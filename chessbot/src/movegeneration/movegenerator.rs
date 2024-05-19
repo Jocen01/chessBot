@@ -1,4 +1,4 @@
-use crate::{board::Board, constants, magic, singlemove::{Move, MoveType}, state::{CastleRights, PiceBoards, State}, Color};
+use crate::{board::Board, constants, movegeneration::singlemove::{Move, MoveType}, board::state::{CastleRights, PiceBoards, State}, board::color::Color, movegeneration::magic};
 
 const QUEENSIDE_CASTLE_MASK_CAPTURE: u64 = 0b1100;
 const QUEENSIDE_CASTLE_MASK_PICES: u64 = 0b1110;
@@ -476,7 +476,7 @@ fn secund_diag_idx(pos: &u8) -> usize{
 
 #[cfg(test)]
 mod tests {
-    use crate::{board::Board, constants, movegenerator::prim_diag_idx};
+    use crate::{board::Board, constants, movegeneration::movegenerator::prim_diag_idx};
 
     use super::MoveGenerator;
 

@@ -186,7 +186,7 @@ fn get_bishop_moves_pos_mask(pos: u8, mask: u64) -> u64{
 
 #[cfg(test)]
 mod test{
-    use crate::{magic::{get_orthogonal_moves, setup, ROOK_MASK}, vec_pos_to_bitmap};
+    use crate::{movegeneration::magic::{get_orthogonal_moves, setup, ROOK_MASK}, utils::vec_pos_to_bitmap};
 
     #[test]
     fn rook_mask_test(){

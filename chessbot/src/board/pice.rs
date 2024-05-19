@@ -1,10 +1,60 @@
-use crate::{constants, singlemove::{Move, MoveType}, state::{CastleRights, State}, Color, PiceType};
+use crate::{constants, movegeneration::singlemove::{Move, MoveType}, board::state::{CastleRights, State}, board::color::Color, utils::get_set_bits};
 
 
 const CAPTURE_BIT: u8 = 5;
 const QUEENSIDE_CASTLE_MASK_CAPTURE: u64 = 0b1100;
 const QUEENSIDE_CASTLE_MASK_PICES: u64 = 0b1110;
 const KINGSIDE_CASTLE_MASK: u64 = 0b1100000;
+
+
+#[derive(Debug,PartialEq, Clone, Copy)]
+pub enum PiceType {
+    King = 6,
+    Queen = 5,
+    Rook = 4,
+    Bishop = 3,
+    Knight = 2,
+    Pawn = 1
+}
+
+
+impl PiceType {
+    pub fn char<'a>(i: u8) -> &'a str{
+        match i & 7 {
+            1 => "p",
+            2 => "n",
+            3 => "b",
+            4 => "r",
+            5 => "q",
+            6 => "k",
+            _ => "X"
+        }
+    }
+
+    pub fn from_char(c: char) -> PiceType{
+        match c.to_ascii_lowercase() {
+            'k' => PiceType::King,
+            'q' => PiceType::Queen,
+            'r' => PiceType::Rook,
+            'b' => PiceType::Bishop,
+            'n' => PiceType::Knight,
+            'p' => PiceType::Pawn,
+            _ => panic!("{} is not a pice type", c)
+        }
+    }
+
+    pub fn _type(i: u8) -> PiceType{
+        match i & 7 {
+            1 => PiceType::Pawn,
+            2 => PiceType::Knight,
+            3 => PiceType::Bishop,
+            4 => PiceType::Rook,
+            5 => PiceType::Queen,
+            6 => PiceType::King,
+            _ => panic!("Not a valid pice type")
+        }
+    }
+}
 
 
 #[derive(Debug, PartialEq, Eq)]
@@ -507,27 +557,12 @@ impl Pice {
     }
 }
 
-fn get_set_bits(pos: &u64) -> Vec<u8>{
-    if *pos == ((1 as u64)<<63){
-        vec![63]
-    }else {
-        let mut i = pos.clone();
-        let mut res = vec![];
-        let mut idx = 0;
-        while i!= 0 {
-            let t = i.trailing_zeros() as u8;
-            res.push(idx + t);
-            idx += t + 1;
-            i >>= t+1
-        }
-        res
-    } 
-}
+
 
 
 #[cfg(test)]
 mod tests {
-    use crate::{board::Board, pice::{get_set_bits, Pice}, singlemove::{Move, MoveType}, vec_pos_to_bitmap, Color, PiceType};
+    use crate::{board::Board, board::pice::{get_set_bits, Pice, PiceType}, movegeneration::singlemove::{Move, MoveType}, utils::vec_pos_to_bitmap, board::color::Color};
 
     #[test]
     fn get_set_bits_63(){
@@ -663,7 +698,7 @@ mod tests {
     #[test] 
     fn king_moves_move_into_check() {
         let mut b: Board = Board::from_fen("rnbq1bnr/pppp1ppp/4p3/6k1/2K5/4P3/PPPP1PPP/RNBQ1BNR w - - 8 6");
-        b.update_moves(crate::Color::Black);
+        b.update_moves(Color::Black);
         assert_eq!(b.get_pice_pos(26).unwrap().moves, vec_pos_to_bitmap(vec![33,17,18,19,27]));
         assert_eq!(b.get_pice_pos(38).unwrap().moves, vec_pos_to_bitmap(vec![45,46,47,37,31]));
     }
@@ -679,15 +714,15 @@ mod tests {
     #[test] 
     fn king_moves_move_only_blocked_by_own_pices() {
         let mut b: Board = Board::from_fen("rnbq1bnr/pppp1ppp/4pk2/8/8/3KP3/PPPP1PPP/RNBQ1BNR w - - 10 7");
-        b.update_moves(crate::Color::White);
-        b.update_moves(crate::Color::Black);
+        b.update_moves(Color::White);
+        b.update_moves(Color::Black);
         assert_eq!(b.get_pice_pos(19).unwrap().moves, vec_pos_to_bitmap(vec![26,27,28,18,12]));
         assert_eq!(b.get_pice_pos(45).unwrap().moves, vec_pos_to_bitmap(vec![52,46,36,37,38]));
     }
 
     #[test] 
     fn promotion_queen() {
-        let mut pice = Pice::new(PiceType::Pawn, crate::Color::White, 50);
+        let mut pice = Pice::new(PiceType::Pawn, Color::White, 50);
         pice.promote_to(PiceType::Queen);
         assert_eq!(pice.color(), Color::White);
     }
