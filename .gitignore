@@ -1,2 +1,4 @@
 chessbot/target
 .vscode
+scripts/*
+engine_versions/*
