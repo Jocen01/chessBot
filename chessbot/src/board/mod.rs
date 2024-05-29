@@ -451,6 +451,11 @@ impl Board {
             }
         }
     }
+
+    #[allow(dead_code)]
+    pub fn p_history(&self) -> Vec<String>{
+        self.moves.iter().map(|mv| mv.long_algebraic_notation()).collect()
+    }
 }
 
 impl fmt::Display for Board {

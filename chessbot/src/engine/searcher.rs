@@ -31,7 +31,7 @@ impl Searcher {
 
     pub fn iterative_deepening(&mut self, board: &mut Board, max_depth: Option<u8>) -> (Move, i32){
         // dont know if table needs clearing
-        self.traspos_table.clear();
+        // self.traspos_table.clear();
         self.searches = 0;
         let mut info = UciMessage::new_empty_info();
         let mut best_move = Move::null_move();
@@ -43,8 +43,11 @@ impl Searcher {
         self.start_time = Instant::now();
         loop {
             let (mv, val_depth) = self.search_alpha_beta(board, alpha, beta, depth, 0, 0, true);
-            // return if searchtime has elapsed
+            // exit if searchtime has elapsed
             if self.start_time.elapsed() >= self.duration {
+                if !mv.is_null_move(){
+                    best_move = mv;
+                }
                 break;
             }
 
@@ -53,7 +56,7 @@ impl Searcher {
             if (val_depth <= alpha) || (val_depth >= beta) {
                 // send info about faild window
                 {
-                    info.info_add_string(format!("window search failed, nodes waisted {}", self.searches));
+                    info.info_add_string(format!("window search failed, nodes waisted {}, val: {}, alpha: {}, beta: {}", self.searches, val_depth, alpha, beta));
                     self.searches = 0;
                     self.tx.send(info).err();
                     info = UciMessage::new_empty_info();
@@ -130,7 +133,6 @@ impl Searcher {
         // full depth is reached return nullmove and evaluation
         if depth == 0{
             let val = self.search_stable_pos(board, alpha, beta);
-            self.traspos_table.record_entry(zobrist, depth, val, TranspositionsFlag::Exact, None);
             return (Move::null_move(),val);
         }
 
@@ -140,13 +142,19 @@ impl Searcher {
         let mut moves = board.get_possible_moves_turn();
         let check = board.in_check();    
         let extend = if check && extentions < MAX_EXTENTIONS { 1 } else { 0 };
+        
         // start with the previous best move in the position
         if let Some(mv) = self.traspos_table.get_best_move(zobrist) {
             board.make_move(mv);
             let (_,mut val) = self.search_alpha_beta(board, -beta, -alpha, depth - 1 + extend, ply + 1, extentions + extend, false);
             val = -val;
-            
             board.undo_last_move();
+
+            // return if searchtime has elapsed
+            if self.start_time.elapsed() >= self.duration {
+                // println!("PV-time, bm: {}, mv: {}, eval: {}, ply: {}, depth: {}", best_move.long_algebraic_notation(), mv.long_algebraic_notation(), alpha, ply, depth);
+                return (mv, alpha);
+            }
 
             //branch can be pruned
             if val >= beta{
@@ -157,13 +165,11 @@ impl Searcher {
             // found a new best move
             if val > alpha{
                 flag = TranspositionsFlag::Exact;
-                alpha = val;
+                
                 best_move = mv;
+                alpha = val;
             }
-            // return if searchtime has elapsed
-            if self.start_time.elapsed() >= self.duration {
-                return (best_move, alpha);
-            }
+            
         }
 
         // return 0 if stalemate else -Inf checkmate
@@ -190,24 +196,18 @@ impl Searcher {
         }
 
         //random ordering for moves before ordering is implemented
-        let mut rng = rand::thread_rng();
-        moves.shuffle(&mut rng);
+        // let mut rng = rand::thread_rng();
+        // moves.shuffle(&mut rng);
 
-        // set a random best move to avoid nullmove being returned
-        if best_move.is_null_move(){
-            if let Some(mv) = moves.first() {
-                best_move = *mv;
-            }
-        }
 
         // nullmove reduction
-        if !prev_nullmove && depth >= 3 && !check && (board.state.white.bitmap_all() | board.state.black.bitmap_all()).count_ones() > 10{
+        if !prev_nullmove && depth >= 3 && !check && (board.state.white.bitmap_all() | board.state.black.bitmap_all()).count_ones() > 10 && best_move.is_null_move(){
             board.make_null_move();
             let (_, mut val) = self.search_alpha_beta(board, -beta, -beta + 1, depth - 1 - NULL_MOVE_REDUCTION, ply + 1, extentions, true);
             val = -val;
             board.undo_null_move();
             if val >= beta{
-                return (Move::null_move(),beta);
+                return (Move::null_move(),val);
             }
         }
         
@@ -218,6 +218,12 @@ impl Searcher {
             let (_,mut val) = self.search_alpha_beta(board, -beta, -alpha, depth - 1 + extend, ply + 1, extentions + extend, false);
             val = -val;
             board.undo_last_move();
+
+            // return if searchtime has elapsed
+            if self.start_time.elapsed() >= self.duration {
+                // println!("time, bm: {}, eval: {}, ply: {}, depth: {}", best_move.long_algebraic_notation(), alpha, ply, depth);
+                return (best_move, alpha);
+            }
 
             //branch can be pruned
             if val >= beta{
@@ -230,13 +236,26 @@ impl Searcher {
                 flag = TranspositionsFlag::Exact;
                 alpha = val;
                 best_move = mv;
-            }
-            
-            // return if searchtime has elapsed
-            if self.start_time.elapsed() >= self.duration {
-                return (best_move, alpha);
-            }
-        }       
+                // if ply == 0{
+                //     println!("new BM: {}, eval: {}, history: {:?}", best_move.long_algebraic_notation(), val, board.p_history());
+                //     if best_move.long_algebraic_notation() == "e7b4".to_string() && depth == 5{
+                //         let r = self.get_current_best_line(board);
+                //         let j: Vec<String> = r.iter().map(|mv| mv.long_algebraic_notation()).collect();
+                //         println!("PV: {:?}",j);
+                //         // return (best_move, alpha);
+                //     }
+                // }
+                // if ply != 0{
+                //     if let Some(first) = board.moves.get(2) {
+                //         if first.from_to_mask() == Move::new(52, 25, crate::movegeneration::singlemove::MoveType::Normal).from_to_mask(){
+                //             if let Some(first) = board.moves.get(3) {
+                //                 if first.from_to_mask() == Move::new(18, 25, crate::movegeneration::singlemove::MoveType::Normal).from_to_mask(){
+                //             println!("bm, eval: {}, mv: {}, ply: {}, history: {:?}", val, mv.long_algebraic_notation(), ply, board.p_history());
+                //         }}}
+                //     }
+                // }
+            }   
+        }      
         //  record the position and the best move found
         self.traspos_table.record_entry(zobrist, depth, alpha, flag, Some(best_move));
         (best_move, alpha)
@@ -308,3 +327,25 @@ impl Searcher {
     }
 }
 
+#[cfg(test)]
+mod test{
+    use std::sync::mpsc;
+
+    use crate::{board::Board, engine::searcher::Searcher, movegeneration::singlemove::{Move, MoveType}, uci::uci_message::UciMessage};
+
+
+    #[test]
+    fn quiet(){
+        let fen = "2r1r1k1/4Bpp1/p1b5/5Q2/1p1pp3/1P5P/2Pq1PP1/2R1R1K1 w - - 0 35";
+        let mut board = Board::from_fen(&fen);
+        let (tx, _) = mpsc::channel::<UciMessage>();
+ 
+        let mut searcher = Searcher::new(5000000, tx);
+        board.make_move(Move::new(4, 3, MoveType::Normal));
+        board.make_move(Move::new(11, 18, MoveType::Normal));
+        board.make_move(Move::new(52, 25, MoveType::Normal));
+        board.make_move(Move::new(18, 25, MoveType::Normal));
+        board.make_move(Move::new(2, 0, MoveType::Normal));
+        assert_eq!(searcher.search_stable_pos(&mut board, 74, 174), 174);
+    }
+}

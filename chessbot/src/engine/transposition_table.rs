@@ -35,7 +35,7 @@ pub struct TranspositionsTable{
 // https://web.archive.org/web/20071031100051/http://www.brucemo.com/compchess/programming/hashing.htm
 impl TranspositionsTable {
     pub fn new(size: usize) -> TranspositionsTable{
-        // println!("entry size: {}", std::mem::size_of::<Entry>());
+        // println!("entry size: {}, nbr_entries: {}", std::mem::size_of::<Entry>(), (32*1024*2024)/std::mem::size_of::<Entry>());
         TranspositionsTable{
             hash_table: (0..size).map(|_| None).collect(),
             size,
@@ -45,11 +45,11 @@ impl TranspositionsTable {
 
     pub fn clear(&mut self){
         self.nbr_filled = 0;
-        self.hash_table = (0..self.size).map(|_| None).collect();
+        // self.hash_table = (0..self.size).map(|_| None).collect();
+        self.hash_table.iter_mut().for_each(|entry| *entry = None);
     }
 
     pub fn lookup_eval(&self, zobrist: u64, depth: usize, alpha: i32, beta: i32) -> Option<i32> {
-
         if let Some(entry) = &self.hash_table[(zobrist as usize) % self.size]{
             if entry.zobrist == zobrist{
                 if entry.depth >= depth{

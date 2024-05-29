@@ -141,3 +141,13 @@ impl fmt::Display for Move {
         writeln!(f, "Move: {{ move_type: {:?}, from: {}, to: {} }}", self.move_type(), self.from(), self.to())
     }
 }
+
+#[cfg(test)]
+mod test{
+    use crate::movegeneration::singlemove::Move;
+
+    #[test]
+    fn t(){
+        assert_eq!("e7b4".to_string(), Move::new(52, 25, crate::movegeneration::singlemove::MoveType::Normal).long_algebraic_notation());
+    }
+}
