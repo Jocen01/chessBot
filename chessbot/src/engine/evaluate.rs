@@ -1,4 +1,4 @@
-use crate::{board::{color::Color, state::{PiceBoards, State}, Board}, constants, movegeneration::singlemove::{Move, MoveType}};
+use crate::{board::{color::Color, state::{PiceBoards, State}, Board}, constants};
 
 // cant use i32::MIN cause if negetet it overflows
 pub const NEGATIVE_INF: i32 = i32::MIN + 10000;
@@ -201,30 +201,7 @@ pub fn to_mate(score: i32) -> i32{
     ((sign_adjusted - NEGATIVE_INF - 9) * sign) / 2
 }
 
-pub fn sort_moves(moves: &mut Vec<Move>, board: &Board){
-    moves.sort_by_cached_key(|mv| {
-        if let Some(captured) = board.get_pice_pos(mv.to()) {
-            if let Some(pice) = board.get_pice_pos(mv.from()) {
-                ((captured.pice_type() as usize) * 100 - pice.pice_type() as usize) * 10_000
-            }else {
-                0
-            }
-        } else if mv.move_type() != MoveType::Normal {
-            match mv.move_type() {
-                MoveType::PromotionQueen => 9_000,
-                MoveType::PromotionKnight => 8_000,
-                MoveType::Castle => 7_000,
-                MoveType::PromotionRook => 6_000,
-                MoveType::PromotionBishop => 5_000,
-                MoveType::Pessant => 4_000,
-                MoveType::Pawndubblemove | MoveType::Normal => 0,
-            }
-        }else {
-            0
-        }
-    });
-    moves.reverse();
-}
+
 
 #[cfg(test)]
 mod tests {

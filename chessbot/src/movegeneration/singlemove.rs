@@ -128,6 +128,10 @@ impl Move {
             None
         }
     }
+
+    pub fn get_hash(&self) -> u32{
+        self.value
+    }
 }
 
 impl fmt::Debug for Move {

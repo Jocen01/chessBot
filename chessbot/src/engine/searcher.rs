@@ -1,4 +1,4 @@
-use crate::{board::Board, engine::evaluate::{self, NEGATIVE_INF, POSETIVE_INF}, movegeneration::singlemove::Move, engine::transposition_table::{TranspositionsFlag, TranspositionsTable}, uci::uci_message::UciMessage};
+use crate::{board::Board, engine::{evaluate::{self, NEGATIVE_INF, POSETIVE_INF}, transposition_table::{TranspositionsFlag, TranspositionsTable}}, movegeneration::{moveorder::MoveOrder, singlemove::Move}, uci::uci_message::UciMessage};
 use rand::prelude::*;
 use std::{collections::HashSet, time::{Duration, Instant}};
 use std::sync::mpsc::Sender;
@@ -15,6 +15,7 @@ pub struct Searcher{
     pub duration: Duration,
     tx: Sender<UciMessage>,
     search_moves: Option<Vec<String>>,
+    move_order: MoveOrder
 }
 
 impl Searcher {
@@ -26,12 +27,14 @@ impl Searcher {
             duration: Duration::from_millis(3000),
             tx,
             search_moves: None,
+            move_order: MoveOrder::default()
         }
     }
 
     pub fn iterative_deepening(&mut self, board: &mut Board, max_depth: Option<u8>) -> (Move, i32){
         // dont know if table needs clearing
         // self.traspos_table.clear();
+        self.move_order.clear();
         self.searches = 0;
         let mut info = UciMessage::new_empty_info();
         let mut best_move = Move::null_move();
@@ -159,15 +162,16 @@ impl Searcher {
             //branch can be pruned
             if val >= beta{
                 self.traspos_table.record_entry(zobrist, depth, ply, val, TranspositionsFlag::LowerBound, Some(mv));
+                self.move_order.add_killer(&mv, ply);
                 return (mv, beta);
             }
 
             // found a new best move
             if val > alpha{
                 flag = TranspositionsFlag::Exact;
-                
                 best_move = mv;
                 alpha = val;
+                self.move_order.add_history(&mv, depth, board.is_white_move())
             }
             
         }
@@ -210,8 +214,8 @@ impl Searcher {
                 return (Move::null_move(),val);
             }
         }
-        
-        evaluate::sort_moves(&mut moves, board);
+        self.move_order.sort_moves(&mut moves, &board, ply);
+        // (&mut moves, board);
 
         for mv in moves{
             board.make_move(mv);
@@ -228,6 +232,7 @@ impl Searcher {
             //branch can be pruned
             if val >= beta{
                 self.traspos_table.record_entry(zobrist, depth, ply, val, TranspositionsFlag::LowerBound, Some(mv));
+                self.move_order.add_killer(&mv, ply);
                 return (mv, beta);
             }
 
@@ -236,6 +241,7 @@ impl Searcher {
                 flag = TranspositionsFlag::Exact;
                 alpha = val;
                 best_move = mv;
+                self.move_order.add_history(&mv, depth, board.is_white_move())
                 // if ply == 0{
                 //     println!("new BM: {}, eval: {}, history: {:?}", best_move.long_algebraic_notation(), val, board.p_history());
                 //     if best_move.long_algebraic_notation() == "e7b4".to_string() && depth == 5{
@@ -278,7 +284,8 @@ impl Searcher {
         let mut rng = rand::thread_rng();
         moves.shuffle(&mut rng);
 
-        evaluate::sort_moves(&mut moves, board);
+        self.move_order.sort_moves(&mut moves, &board, 100);
+        // evaluate::sort_moves(&mut moves, board);
 
         for mv in moves{
             board.make_move(mv);

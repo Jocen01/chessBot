@@ -456,6 +456,10 @@ impl Board {
     pub fn p_history(&self) -> Vec<String>{
         self.moves.iter().map(|mv| mv.long_algebraic_notation()).collect()
     }
+
+    pub fn is_white_move(&self) -> bool{
+        self.turn == Color::White
+    }
 }
 
 impl fmt::Display for Board {
