@@ -123,7 +123,7 @@ impl Searcher {
         }
 
         // lookup the position if it exists in the table
-        if let Some(val) = self.traspos_table.lookup_eval(zobrist, depth, alpha, beta){
+        if let Some(val) = self.traspos_table.lookup_eval(zobrist, depth, ply, alpha, beta){
             if let Some(best) = self.traspos_table.get_best_move(zobrist) {
                 return (best, val);
             }
@@ -158,7 +158,7 @@ impl Searcher {
 
             //branch can be pruned
             if val >= beta{
-                self.traspos_table.record_entry(zobrist, depth, val, TranspositionsFlag::LowerBound, Some(mv));
+                self.traspos_table.record_entry(zobrist, depth, ply, val, TranspositionsFlag::LowerBound, Some(mv));
                 return (mv, beta);
             }
 
@@ -227,7 +227,7 @@ impl Searcher {
 
             //branch can be pruned
             if val >= beta{
-                self.traspos_table.record_entry(zobrist, depth, val, TranspositionsFlag::LowerBound, Some(mv));
+                self.traspos_table.record_entry(zobrist, depth, ply, val, TranspositionsFlag::LowerBound, Some(mv));
                 return (mv, beta);
             }
 
@@ -257,7 +257,7 @@ impl Searcher {
             }   
         }      
         //  record the position and the best move found
-        self.traspos_table.record_entry(zobrist, depth, alpha, flag, Some(best_move));
+        self.traspos_table.record_entry(zobrist, depth, ply, alpha, flag, Some(best_move));
         (best_move, alpha)
     }
 

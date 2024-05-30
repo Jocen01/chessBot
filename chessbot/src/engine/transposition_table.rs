@@ -1,5 +1,7 @@
 use crate::movegeneration::singlemove::Move;
 
+use super::evaluate;
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum TranspositionsFlag{
     Exact = 0,
@@ -49,16 +51,17 @@ impl TranspositionsTable {
         self.hash_table.iter_mut().for_each(|entry| *entry = None);
     }
 
-    pub fn lookup_eval(&self, zobrist: u64, depth: usize, alpha: i32, beta: i32) -> Option<i32> {
+    pub fn lookup_eval(&self, zobrist: u64, depth: usize, ply: usize, alpha: i32, beta: i32) -> Option<i32> {
         if let Some(entry) = &self.hash_table[(zobrist as usize) % self.size]{
             if entry.zobrist == zobrist{
                 if entry.depth >= depth{
+                    let score = self.retrive_score(entry.value, ply);
                     if entry.flag == TranspositionsFlag::Exact{
-                        return Some(entry.value)
+                        return Some(score)
                     }else if entry.flag == TranspositionsFlag::UpperBound && entry.value <= alpha {
-                        return Some(entry.value)
+                        return Some(score)
                     }else if entry.flag == TranspositionsFlag::LowerBound && entry.value >= beta {
-                        return Some(entry.value)
+                        return Some(score)
                     }
                 }
             }
@@ -66,13 +69,13 @@ impl TranspositionsTable {
         None
     }
 
-    pub fn record_entry(&mut self, zobrist: u64, depth: usize, value: i32, flag: TranspositionsFlag, mut best_move: Option<Move>){
+    pub fn record_entry(&mut self, zobrist: u64, depth: usize, ply: usize, value: i32, flag: TranspositionsFlag, mut best_move: Option<Move>){
         if let Some(mv) = best_move{
             if mv.is_null_move(){
                 best_move = None;
             }
         }
-        let entry = Entry::new(zobrist, depth, flag, value, best_move);
+        let entry = Entry::new(zobrist, depth, flag, self.store_score(value, ply), best_move);
         if let None = self.hash_table[(zobrist as usize) % self.size] { self.nbr_filled+=1 };
         self.hash_table[(zobrist as usize) % self.size] = Some(entry);
     }
@@ -88,5 +91,21 @@ impl TranspositionsTable {
 
     pub fn get_permill_fill(&self) -> u16{
         (self.nbr_filled * 1000 / self.size) as u16
+    }
+
+    fn store_score(&self, score: i32, ply: usize) -> i32{
+        if evaluate::is_mate_score(score){
+            let sign = score.signum();
+            return (score * sign + ply as i32) * sign;
+        }
+        score
+    }
+
+    fn retrive_score(&self, score: i32, ply: usize) -> i32{
+        if evaluate::is_mate_score(score){
+            let sign = score.signum();
+            return (score * sign - ply as i32) * sign;
+        }
+        score
     }
 }
