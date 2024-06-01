@@ -230,4 +230,11 @@ mod tests {
         assert!(evaluate_turn(&board) > 100);
     }
 
+    #[test]
+    fn test_eval(){
+        let fen = "3RK3/5N1k/8/6p1/1P2q3/8/8/8 w - - 16 70";
+        let board = Board::from_fen(&fen);
+        assert_ne!(evaluate_turn(&board), 0);
+    }
+
 }

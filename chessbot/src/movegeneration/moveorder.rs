@@ -72,3 +72,8 @@ impl MoveOrder {
         }
     }
 }
+
+// TODO check if move results in check
+pub fn late_move_reduction(ply_remaining: usize, extentions: usize, check: bool, mv: &Move, nbr_evaluated_moves: usize) -> bool{
+    ply_remaining >= 3 && extentions == 0 && nbr_evaluated_moves >= 3 && !check && !mv.move_type().is_promotion()
+}

@@ -1,12 +1,13 @@
-use crate::{board::Board, engine::{evaluate::{self, NEGATIVE_INF, POSETIVE_INF}, transposition_table::{TranspositionsFlag, TranspositionsTable}}, movegeneration::{moveorder::MoveOrder, singlemove::Move}, uci::uci_message::UciMessage};
+use crate::{board::Board, engine::{evaluate::{self, NEGATIVE_INF, POSETIVE_INF}, transposition_table::{TranspositionsFlag, TranspositionsTable}}, movegeneration::{moveorder::{self, MoveOrder}, singlemove::Move}, uci::uci_message::UciMessage};
 use rand::prelude::*;
 use std::{collections::HashSet, time::{Duration, Instant}};
 use std::sync::mpsc::Sender;
 
 
-const MAX_EXTENTIONS: usize = 2;
+const MAX_EXTENTIONS: usize = 6;
 const NULL_MOVE_REDUCTION: usize = 2;
 const WINDOW: i32 = 50;
+const LMR: usize = 1;
 
 pub struct Searcher{
     traspos_table: TranspositionsTable,
@@ -15,7 +16,8 @@ pub struct Searcher{
     pub duration: Duration,
     tx: Sender<UciMessage>,
     search_moves: Option<Vec<String>>,
-    move_order: MoveOrder
+    move_order: MoveOrder,
+    history: HashSet<u64>
 }
 
 impl Searcher {
@@ -27,7 +29,8 @@ impl Searcher {
             duration: Duration::from_millis(3000),
             tx,
             search_moves: None,
-            move_order: MoveOrder::default()
+            move_order: MoveOrder::default(),
+            history: HashSet::new()
         }
     }
 
@@ -125,17 +128,26 @@ impl Searcher {
             return (Move::null_move(), evaluate::draw_by_repetition());
         }
 
-        // lookup the position if it exists in the table
-        if let Some(val) = self.traspos_table.lookup_eval(zobrist, depth, ply, alpha, beta){
-            if let Some(best) = self.traspos_table.get_best_move(zobrist) {
-                return (best, val);
-            }
-            return (Move::null_move(),val);
+        if !self.history.insert(zobrist){
+            return (Move::null_move(), evaluate::draw_by_repetition());
         }
+
+        // lookup the position if it exists in the table
+        if ply != 0{
+            if let Some(val) = self.traspos_table.lookup_eval(zobrist, depth, ply, alpha, beta){
+                self.history.remove(&zobrist);
+                if let Some(best) = self.traspos_table.get_best_move(zobrist) {
+                    return (best, val);
+                }
+                return (Move::null_move(),val);
+            }
+        }
+        
         
         // full depth is reached return nullmove and evaluation
         if depth == 0{
             let val = self.search_stable_pos(board, alpha, beta);
+            self.history.remove(&zobrist);
             return (Move::null_move(),val);
         }
 
@@ -156,6 +168,7 @@ impl Searcher {
             // return if searchtime has elapsed
             if self.start_time.elapsed() >= self.duration {
                 // println!("PV-time, bm: {}, mv: {}, eval: {}, ply: {}, depth: {}", best_move.long_algebraic_notation(), mv.long_algebraic_notation(), alpha, ply, depth);
+                self.history.remove(&zobrist);
                 return (mv, alpha);
             }
 
@@ -163,6 +176,7 @@ impl Searcher {
             if val >= beta{
                 self.traspos_table.record_entry(zobrist, depth, ply, val, TranspositionsFlag::LowerBound, Some(mv));
                 self.move_order.add_killer(&mv, ply);
+                self.history.remove(&zobrist);
                 return (mv, beta);
             }
 
@@ -178,6 +192,7 @@ impl Searcher {
 
         // return 0 if stalemate else -Inf checkmate
         if moves.is_empty(){
+            self.history.remove(&zobrist);
             if board.in_check(){
                 return (Move::null_move(), evaluate::mate_ajusted_score(ply));
             }else {
@@ -211,21 +226,34 @@ impl Searcher {
             val = -val;
             board.undo_null_move();
             if val >= beta{
+                self.history.remove(&zobrist);
                 return (Move::null_move(),val);
             }
         }
         self.move_order.sort_moves(&mut moves, &board, ply);
         // (&mut moves, board);
-
+        let mut idx = 0;
         for mv in moves{
             board.make_move(mv);
-            let (_,mut val) = self.search_alpha_beta(board, -beta, -alpha, depth - 1 + extend, ply + 1, extentions + extend, false);
+            let mut val = 0;
+            let mut full = true;
+            if moveorder::late_move_reduction(depth, extend, check, &mv, idx){
+                (_, val) = self.search_alpha_beta(board, -beta, -alpha, depth - 1 - LMR, ply + 1, extentions + extend, false);
+                if -val <= alpha{
+                    full = false;
+                }
+            }
+            if full{
+                (_, val) = self.search_alpha_beta(board, -beta, -alpha, depth - 1 + extend, ply + 1, extentions + extend, false);
+
+            }
             val = -val;
             board.undo_last_move();
 
             // return if searchtime has elapsed
             if self.start_time.elapsed() >= self.duration {
                 // println!("time, bm: {}, eval: {}, ply: {}, depth: {}", best_move.long_algebraic_notation(), alpha, ply, depth);
+                self.history.remove(&zobrist);
                 return (best_move, alpha);
             }
 
@@ -233,6 +261,7 @@ impl Searcher {
             if val >= beta{
                 self.traspos_table.record_entry(zobrist, depth, ply, val, TranspositionsFlag::LowerBound, Some(mv));
                 self.move_order.add_killer(&mv, ply);
+                self.history.remove(&zobrist);
                 return (mv, beta);
             }
 
@@ -242,28 +271,12 @@ impl Searcher {
                 alpha = val;
                 best_move = mv;
                 self.move_order.add_history(&mv, depth, board.is_white_move())
-                // if ply == 0{
-                //     println!("new BM: {}, eval: {}, history: {:?}", best_move.long_algebraic_notation(), val, board.p_history());
-                //     if best_move.long_algebraic_notation() == "e7b4".to_string() && depth == 5{
-                //         let r = self.get_current_best_line(board);
-                //         let j: Vec<String> = r.iter().map(|mv| mv.long_algebraic_notation()).collect();
-                //         println!("PV: {:?}",j);
-                //         // return (best_move, alpha);
-                //     }
-                // }
-                // if ply != 0{
-                //     if let Some(first) = board.moves.get(2) {
-                //         if first.from_to_mask() == Move::new(52, 25, crate::movegeneration::singlemove::MoveType::Normal).from_to_mask(){
-                //             if let Some(first) = board.moves.get(3) {
-                //                 if first.from_to_mask() == Move::new(18, 25, crate::movegeneration::singlemove::MoveType::Normal).from_to_mask(){
-                //             println!("bm, eval: {}, mv: {}, ply: {}, history: {:?}", val, mv.long_algebraic_notation(), ply, board.p_history());
-                //         }}}
-                //     }
-                // }
-            }   
+            }
+            idx += 1; 
         }      
         //  record the position and the best move found
         self.traspos_table.record_entry(zobrist, depth, ply, alpha, flag, Some(best_move));
+        self.history.remove(&zobrist);
         (best_move, alpha)
     }
 

@@ -18,6 +18,10 @@ impl MoveType {
     pub fn iter_promotions() -> Vec<MoveType>{
         vec![MoveType::PromotionQueen, MoveType::PromotionRook, MoveType::PromotionBishop, MoveType::PromotionKnight]
     }
+
+    pub fn is_promotion(&self) -> bool{
+        self == &MoveType::PromotionQueen || self == &MoveType::PromotionRook || self == &MoveType::PromotionBishop || self == &MoveType::PromotionKnight
+    }
 }
 
 #[derive(Clone, Copy)]
